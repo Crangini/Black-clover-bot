@@ -1137,4 +1137,12 @@ export function startBot() {
     logger.error({ err }, "Impossible de connecter le bot Discord");
   });
 }
+process.on("unhandledRejection", (err) => {
+  logger.error({ err }, "Promesse rejetée non gérée");
+});
 
+process.on("uncaughtException", (err) => {
+  logger.error({ err }, "Exception non gérée");
+});
+
+startBot();
