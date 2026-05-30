@@ -169,12 +169,9 @@ client.on("guildMemberAdd", async (member) => {
   }
 
   if (!welcomeChannel) {
-    logger.warn({ guildId: guild.id }, "Salon de bienvenue introuvable");
+} else {
     return;
   }
-
-  try {
-    await member.roles.add("1510238919445450772");
     logger.info({ guildId: guild.id, userId: member.id }, "Rôle automatique attribué");
   } catch (err) {
     logger.error({ err, guildId: guild.id }, "Erreur lors de l'attribution du rôle automatique");
