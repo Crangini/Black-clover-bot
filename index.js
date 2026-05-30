@@ -16,6 +16,7 @@ import {
 } from "discord.js";
 import { logger } from "./lib/logger.js";
 import { tryGiveXp, getUserProgress, getLeaderboard, getUserRank } from "./xp.js";
+import { addWarning, getWarnings } from "./warnings.js";
 import { hasRole, MOD_ROLES } from "./utils.js";
 import {
   initGiveaways,
@@ -96,12 +97,14 @@ const baseCommands = [
   new SlashCommandBuilder()
     .setName("kick")
     .setDescription("Expulser un membre du serveur")
+    .setDefaultMemberPermissions(0)
     .addUserOption((o) => o.setName("membre").setDescription("Le membre à expulser").setRequired(true))
     .addStringOption((o) => o.setName("raison").setDescription("Raison de l'expulsion").setRequired(false))
     .toJSON(),
   new SlashCommandBuilder()
     .setName("ban")
     .setDescription("Bannir un membre du serveur")
+    .setDefaultMemberPermissions(0)
     .addUserOption((o) => o.setName("membre").setDescription("Le membre à bannir").setRequired(true))
     .addStringOption((o) => o.setName("raison").setDescription("Raison du ban").setRequired(false))
     .addIntegerOption((o) =>
@@ -112,6 +115,32 @@ const baseCommands = [
         .setMinValue(0)
         .setMaxValue(7),
     )
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName("mute")
+    .setDescription("Rendre muet un membre temporairement")
+    .setDefaultMemberPermissions(0)
+    .addUserOption((o) => o.setName("membre").setDescription("Le membre à mute").setRequired(true))
+    .addStringOption((o) =>
+      o
+        .setName("durée")
+        .setDescription("Durée du mute (ex: 5m, 30m, 1h, 12h, 48h — entre 5m et 48h)")
+        .setRequired(true),
+    )
+    .addStringOption((o) => o.setName("raison").setDescription("Raison du mute").setRequired(false))
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName("warn")
+    .setDescription("Avertir un membre")
+    .setDefaultMemberPermissions(0)
+    .addUserOption((o) => o.setName("membre").setDescription("Le membre à avertir").setRequired(true))
+    .addStringOption((o) => o.setName("raison").setDescription("Raison de l'avertissement").setRequired(true))
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName("warnings")
+    .setDescription("Voir les avertissements d'un membre")
+    .setDefaultMemberPermissions(0)
+    .addUserOption((o) => o.setName("membre").setDescription("Le membre à inspecter").setRequired(true))
     .toJSON(),
 ];
 
@@ -139,7 +168,7 @@ async function registerCommandsForGuild(guild, appId) {
 }
 
 client.once("clientReady", async (c) => {
-  logger.info({ tag: c.user.tag }, "Bot Discord connecté");
+  logger.info({ tag: c.user.tag, at: new Date().toISOString() }, "✅ Bot Discord connecté");
   rest = new REST({ version: "10" }).setToken(token);
   initGiveaways(c);
   for (const guild of c.guilds.cache.values()) {
@@ -147,6 +176,22 @@ client.once("clientReady", async (c) => {
   }
   await postReglement();
   await postTicketEmbed();
+});
+
+client.on("disconnect", () => {
+  logger.warn({ at: new Date().toISOString() }, "⚠️ Bot déconnecté de Discord");
+});
+
+client.on("reconnecting", () => {
+  logger.info({ at: new Date().toISOString() }, "🔄 Bot en cours de reconnexion...");
+});
+
+client.on("error", (err) => {
+  logger.error({ err, at: new Date().toISOString() }, "❌ Erreur client Discord");
+});
+
+client.on("warn", (info) => {
+  logger.warn({ info, at: new Date().toISOString() }, "⚠️ Avertissement Discord");
 });
 
 client.on("guildCreate", async (guild) => {
@@ -291,6 +336,12 @@ client.on("interactionCreate", async (interaction) => {
     await handleKick(interaction);
   } else if (interaction.commandName === "ban") {
     await handleBan(interaction);
+  } else if (interaction.commandName === "mute") {
+    await handleMute(interaction);
+  } else if (interaction.commandName === "warn") {
+    await handleWarn(interaction);
+  } else if (interaction.commandName === "warnings") {
+    await handleWarnings(interaction);
   }
 });
 
@@ -1122,12 +1173,183 @@ client.on("messageCreate", async (message) => {
   }
 });
 
+function parseDuration(str) {
+  const regex = /^(?:(\d+)h)?(?:(\d+)m)?$/;
+  const match = str.trim().match(regex);
+  if (!match || (!match[1] && !match[2])) return null;
+  const hours = parseInt(match[1] ?? 0);
+  const minutes = parseInt(match[2] ?? 0);
+  const ms = (hours * 60 + minutes) * 60 * 1000;
+  const MIN = 5 * 60 * 1000;
+  const MAX = 48 * 60 * 60 * 1000;
+  if (ms < MIN || ms > MAX) return null;
+  return ms;
+}
+
+async function handleMute(interaction) {
+  if (!hasRole(interaction.member, MOD_ROLES)) {
+    await interaction.reply({ content: "❌ Tu n'as pas la permission d'utiliser cette commande.", ephemeral: true });
+    return;
+  }
+
+  const targetUser = interaction.options.getUser("membre", true);
+  const duréeStr = interaction.options.getString("durée", true);
+  const raison = interaction.options.getString("raison") ?? "Aucune raison fournie";
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  const ms = parseDuration(duréeStr);
+  if (!ms) {
+    await interaction.reply({
+      content: "❌ Durée invalide. Utilise un format comme `5m`, `30m`, `1h`, `2h30m`, `48h` (entre 5m et 48h).",
+      ephemeral: true,
+    });
+    return;
+  }
+
+  let target;
+  try {
+    target = await guild.members.fetch(targetUser.id);
+  } catch {
+    await interaction.reply({ content: "❌ Impossible de trouver ce membre.", ephemeral: true });
+    return;
+  }
+
+  if (!target.moderatable) {
+    await interaction.reply({ content: "❌ Je ne peux pas mute ce membre (rôle trop élevé ou protégé).", ephemeral: true });
+    return;
+  }
+
+  if (target.id === interaction.user.id) {
+    await interaction.reply({ content: "❌ Tu ne peux pas te mute toi-même.", ephemeral: true });
+    return;
+  }
+
+  try {
+    await target.timeout(ms, raison);
+    const heures = Math.floor(ms / 3600000);
+    const minutes = Math.floor((ms % 3600000) / 60000);
+    const duréeLabel = heures > 0
+      ? `${heures}h${minutes > 0 ? `${minutes}m` : ""}`
+      : `${minutes}m`;
+
+    const embed = new EmbedBuilder()
+      .setColor(0xffa500)
+      .setTitle("🔇 Membre muet")
+      .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
+      .addFields(
+        { name: "Membre", value: `${targetUser} (${targetUser.tag})`, inline: true },
+        { name: "Durée", value: duréeLabel, inline: true },
+        { name: "Modérateur", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
+        { name: "Raison", value: raison, inline: false },
+      )
+      .setTimestamp();
+
+    await interaction.reply({ embeds: [embed] });
+    await sendLog(embed);
+    logger.info({ targetId: targetUser.id, modId: interaction.user.id, ms, raison }, "Membre mute");
+  } catch (err) {
+    logger.error({ err }, "Erreur lors du mute");
+    await interaction.reply({ content: "❌ Une erreur est survenue lors du mute.", ephemeral: true });
+  }
+}
+
+async function handleWarn(interaction) {
+  if (!hasRole(interaction.member, MOD_ROLES)) {
+    await interaction.reply({ content: "❌ Tu n'as pas la permission d'utiliser cette commande.", ephemeral: true });
+    return;
+  }
+
+  const targetUser = interaction.options.getUser("membre", true);
+  const raison = interaction.options.getString("raison", true);
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  const totalWarns = addWarning(targetUser.id, interaction.user.id, raison);
+
+  const embed = new EmbedBuilder()
+    .setColor(0xffcc00)
+    .setTitle("⚠️ Avertissement")
+    .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
+    .addFields(
+      { name: "Membre", value: `${targetUser} (${targetUser.tag})`, inline: true },
+      { name: "Avertissement n°", value: `${totalWarns}`, inline: true },
+      { name: "Modérateur", value: `${interaction.user} (${interaction.user.tag})`, inline: false },
+      { name: "Raison", value: raison, inline: false },
+    )
+    .setTimestamp();
+
+  try {
+    await targetUser.send({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0xffcc00)
+          .setTitle("⚠️ Tu as reçu un avertissement")
+          .setDescription(`Tu as été averti(e) sur **${guild.name}**.`)
+          .addFields(
+            { name: "Raison", value: raison },
+            { name: "Avertissement n°", value: `${totalWarns}` },
+          )
+          .setTimestamp(),
+      ],
+    });
+  } catch {
+    logger.warn({ userId: targetUser.id }, "Impossible d'envoyer le DM d'avertissement");
+  }
+
+  await interaction.reply({ embeds: [embed] });
+  await sendLog(embed);
+  logger.info({ targetId: targetUser.id, modId: interaction.user.id, raison, totalWarns }, "Membre averti");
+}
+
+async function handleWarnings(interaction) {
+  if (!hasRole(interaction.member, MOD_ROLES)) {
+    await interaction.reply({ content: "❌ Tu n'as pas la permission d'utiliser cette commande.", ephemeral: true });
+    return;
+  }
+  const targetUser = interaction.options.getUser("membre", true);
+  const warns = getWarnings(targetUser.id);
+
+  if (warns.length === 0) {
+    await interaction.reply({
+      embeds: [
+        new EmbedBuilder()
+          .setColor(0x57f287)
+          .setTitle(`📋 Avertissements de ${targetUser.username}`)
+          .setDescription("✅ Aucun avertissement enregistré.")
+          .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
+          .setTimestamp(),
+      ],
+    });
+    return;
+  }
+
+  const fields = warns.map((w, i) => ({
+    name: `Warn #${i + 1} — ${new Date(w.date).toLocaleDateString("fr-FR")}`,
+    value: `**Raison :** ${w.raison}\n**Modérateur :** <@${w.moderatorId}>`,
+    inline: false,
+  }));
+
+  const embed = new EmbedBuilder()
+    .setColor(0xffcc00)
+    .setTitle(`⚠️ Avertissements de ${targetUser.username}`)
+    .setThumbnail(targetUser.displayAvatarURL({ size: 256 }))
+    .addFields(fields)
+    .setFooter({ text: `Total : ${warns.length} avertissement(s)` })
+    .setTimestamp();
+
+  await interaction.reply({ embeds: [embed] });
+}
+
 export function startBot() {
   if (!token) return;
   client.login(token).catch((err) => {
     logger.error({ err }, "Impossible de connecter le bot Discord");
   });
 }
+
+startBot();
+
 process.on("unhandledRejection", (err) => {
   logger.error({ err }, "Promesse rejetée non gérée");
 });
@@ -1136,4 +1358,5 @@ process.on("uncaughtException", (err) => {
   logger.error({ err }, "Exception non gérée");
 });
 
-startBot();
+
+}
