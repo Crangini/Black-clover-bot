@@ -158,23 +158,14 @@ client.on("guildCreate", async (guild) => {
 
 client.on("guildMemberAdd", async (member) => {
   const guild = member.guild;
-  const welcomeChannelId = process.env["WELCOME_CHANNEL_ID"];
+  const WELCOME_CHANNEL_ID = "1510239032775413952";
   let welcomeChannel;
 
-  if (welcomeChannelId) {
-    try {
-      const fetched = await guild.channels.fetch(welcomeChannelId);
-      if (fetched?.isTextBased()) welcomeChannel = fetched;
-    } catch {
-      logger.warn({ guildId: guild.id, welcomeChannelId }, "Impossible de récupérer le salon par ID");
-    }
-  } else {
-    await guild.channels.fetch();
-    welcomeChannel = guild.channels.cache.find(
-      (ch) =>
-        ch.isTextBased() &&
-        (ch.name.toLowerCase().includes("bienvenue") || ch.name.includes("🏮") || ch.name.includes("welcome")),
-    );
+  try {
+    const fetched = await guild.channels.fetch(WELCOME_CHANNEL_ID);
+    if (fetched?.isTextBased()) welcomeChannel = fetched;
+  } catch {
+    logger.warn({ guildId: guild.id, WELCOME_CHANNEL_ID }, "Impossible de récupérer le salon de bienvenue");
   }
 
   if (!welcomeChannel) {
