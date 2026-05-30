@@ -158,7 +158,7 @@ client.on("guildCreate", async (guild) => {
 
 client.on("guildMemberAdd", async (member) => {
   const guild = member.guild;
-  const WELCOME_CHANNEL_ID = "1510239032775413952";
+ const WELCOME_CHANNEL_ID = "1510239032775413952";
   let welcomeChannel;
 
   try {
