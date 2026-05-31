@@ -40,6 +40,40 @@ let reglementMessageId = null;
 const LORE_CHANNEL_ID = "1510239036919250974";
 const MAP_CHANNEL_ID = "1510239118288752774";
 const CLOVER_LORE_CHANNEL_ID = "1510621132099948645";
+const HEART_LORE_CHANNEL_ID = "1510621370520834088";
+const DIAMOND_LORE_CHANNEL_ID = "1510621450862858470";
+const SPADE_LORE_CHANNEL_ID = "1510621515974971425";
+const GRIMOIRE_LORE_CHANNEL_ID = "1510631048067682405";
+
+const EMBED_MESSAGE_IDS = [
+  "1510631485328195584",
+  "1510631883396874471",
+  "1510632003123286076",
+  "1510632069112529036",
+  "1510634338910208080",
+  "1510634254047121478",
+  "1510634064741404812",
+  "1510633985426980865",
+  "1510633912752148593",
+  "1510633040584638534",
+  "1510632972221550664",
+  "1510632893951639685",
+  "1510632819527778476",
+  "1510632752704131243",
+  "1510632589910610091",
+  "1510632297827799181",
+  "1510634640300314714",
+  "1510634588437741749",
+  "1510627322594721923",
+  "1510627221692481567",
+  "1510627136602509313",
+  "1510626662826512515",
+  "1510625981675601921",
+  "1510625369328324638",
+  "1510625075869777981",
+  "1510622747473088583",
+  "1510622649707925674",
+];
 
 const pfcGames = new Map();
 
@@ -272,7 +306,7 @@ async function registerCommandsForGuild(guild, appId) {
       .setName("createfiche")
       .setDescription("Crée une fiche de personnage RP")
       .addUserOption((o) =>
-        o.setName("membre").setDescription("Le membre concerné (toi par défaut, staff uniquement pour un autre)").setRequired(false),
+        o.setName("membre").setDescription("Le membre concerné (staff uniquement pour un autre)").setRequired(true),
       )
       .addStringOption((o) =>
         o.setName("role").setDescription("Le rôle du personnage").setRequired(true).addChoices(...makeChoices(FICHE_ROLE_IDS)),
@@ -318,6 +352,11 @@ client.once("clientReady", async (c) => {
   await postLore();
   await postKingdomMap();
   await postCloverLore();
+  await postHeartLore();
+  await postDiamondLore();
+  await postSpadeLore();
+  await postFiveLeafGrimoire();
+  await postLoreEmbeds();
   await postTicketEmbed();
 });
 
@@ -584,6 +623,8 @@ async function handleDeletefiche(interaction) {
       .setTimestamp(),
   );
 }
+
+
 
 async function handleCreatefiche(interaction) {
   const guild = interaction.guild;
@@ -1669,6 +1710,895 @@ async function postCloverLore() {
     logger.info({ messageId: msg.id }, "Lore Clover posté avec succès");
   } catch (err) {
     logger.error({ err }, "Erreur lors de la publication du lore Clover");
+  }
+}
+
+async function postHeartLore() {
+  try {
+    const channel = await client.channels.fetch(HEART_LORE_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      logger.warn({ channelId: HEART_LORE_CHANNEL_ID }, "Salon lore Heart introuvable");
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 20 });
+    const existing = messages.find((m) => m.author.id === client.user.id && m.embeds.length > 0);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x27ae60)
+      .setTitle("🌿 Royaume de Heart")
+      .setDescription(
+        [
+          "Le Royaume de Heart est connu pour son lien extrêmement fort avec la nature et le mana naturel.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "Contrairement aux autres royaumes, les habitants apprennent à utiliser le mana présent dans leur environnement afin d'augmenter la puissance de leurs sorts.",
+          "",
+          "Cette maîtrise du mana naturel permet à leurs mages de lancer des techniques extrêmement avancées.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "Heart entretient également un lien privilégié avec les **Esprits Élémentaires**.",
+          "",
+          "*Un royaume où la nature et la magie ne forment qu'un.*",
+        ].join("\n"),
+      )
+      .setImage("https://static.wikia.nocookie.net/blackclover/images/5/5f/Heart_Kingdom.png/revision/latest?cb=20191110101738")
+      .setThumbnail("https://static.wikia.nocookie.net/blackclover/images/3/3d/Heart_Kingdom_Symbol.png/revision/latest?cb=20200109174741")
+      .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
+
+    if (existing) {
+      await existing.edit({ embeds: [embed] });
+      logger.info({ messageId: existing.id }, "Lore Heart mis à jour");
+      return;
+    }
+
+    const msg = await channel.send({ embeds: [embed] });
+    logger.info({ messageId: msg.id }, "Lore Heart posté avec succès");
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de la publication du lore Heart");
+  }
+}
+
+async function postDiamondLore() {
+  try {
+    const channel = await client.channels.fetch(DIAMOND_LORE_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      logger.warn({ channelId: DIAMOND_LORE_CHANNEL_ID }, "Salon lore Diamond introuvable");
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 20 });
+    const existing = messages.find((m) => m.author.id === client.user.id && m.embeds.length > 0);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x3498db)
+      .setTitle("⚔️ Royaume de Diamond")
+      .setDescription(
+        [
+          "Le Royaume de Diamond est une **nation militaire**.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "La recherche magique et le développement de nouvelles armes y occupent une place importante.",
+          "",
+          "Diamond est réputé pour ses méthodes parfois extrêmes, notamment certaines expérimentations magiques réalisées dans le but de créer des soldats plus puissants.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "Ses armées figurent parmi les plus **redoutées du continent**.",
+          "",
+          "*Un royaume forgé dans l'acier et le mana, où la puissance prime sur tout.*",
+        ].join("\n"),
+      )
+      .setImage("https://static.wikia.nocookie.net/blackclover/images/f/f5/Diamond_Kingdom_anime.png/revision/latest?cb=20181006164455")
+      .setThumbnail("https://static.wikia.nocookie.net/blackclover/images/2/2b/Diamond_Kingdom_Symbol.png/revision/latest?cb=20200109174746")
+      .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
+
+    if (existing) {
+      await existing.edit({ embeds: [embed] });
+      logger.info({ messageId: existing.id }, "Lore Diamond mis à jour");
+      return;
+    }
+
+    const msg = await channel.send({ embeds: [embed] });
+    logger.info({ messageId: msg.id }, "Lore Diamond posté avec succès");
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de la publication du lore Diamond");
+  }
+}
+
+async function postSpadeLore() {
+  try {
+    const channel = await client.channels.fetch(SPADE_LORE_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      logger.warn({ channelId: SPADE_LORE_CHANNEL_ID }, "Salon lore Spade introuvable");
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 20 });
+    const existing = messages.find((m) => m.author.id === client.user.id && m.embeds.length > 0);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x9b59b6)
+      .setTitle("❄️ Royaume de Spade")
+      .setDescription(
+        [
+          "Situé dans les régions les plus froides du continent, le Royaume de Spade est une **terre rude** où seuls les plus résistants survivent.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "L'histoire du royaume est liée à de nombreux mystères concernant les **Diables** et le **Monde Souterrain**.",
+          "",
+          "Spade a vu naître certains des plus puissants mages de l'histoire et reste aujourd'hui encore l'une des nations les plus dangereuses du continent.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "*Un royaume enveloppé d'ombre, de glace et de secrets indicibles.*",
+        ].join("\n"),
+      )
+      .setImage("https://static.wikia.nocookie.net/blackclover/images/1/11/Spade_Kingdom.png/revision/latest?cb=20200211155443")
+      .setThumbnail("https://static.wikia.nocookie.net/blackclover/images/b/b4/Spade_Kingdom_Symbol.png/revision/latest?cb=20200109174750")
+      .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
+
+    if (existing) {
+      await existing.edit({ embeds: [embed] });
+      logger.info({ messageId: existing.id }, "Lore Spade mis à jour");
+      return;
+    }
+
+    const msg = await channel.send({ embeds: [embed] });
+    logger.info({ messageId: msg.id }, "Lore Spade posté avec succès");
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de la publication du lore Spade");
+  }
+}
+
+async function postFiveLeafGrimoire() {
+  try {
+    const channel = await client.channels.fetch(GRIMOIRE_LORE_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      logger.warn({ channelId: GRIMOIRE_LORE_CHANNEL_ID }, "Salon grimoire cinq feuilles introuvable");
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 20 });
+    const existing = messages.find((m) => m.author.id === client.user.id && m.embeds.length > 0);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x1a1a2e)
+      .setTitle("🖤 Grimoire à Cinq Feuilles")
+      .setDescription(
+        [
+          "Les grimoires à cinq feuilles sont considérés comme des **légendes**.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "Selon une ancienne croyance :",
+          "",
+          "*« Dans la cinquième feuille réside un démon. »*",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "Un grimoire à cinq feuilles **ne naît pas naturellement**.",
+          "",
+          "Il apparaît lorsqu'un propriétaire de grimoire à quatre feuilles sombre dans un désespoir absolu, suffisamment puissant pour corrompre son grimoire.",
+          "",
+          "À ce moment-là, un **Diable** peut potentiellement entrer en contact avec ce grimoire.",
+          "",
+          "Ces grimoires sont extrêmement rares et entourés de nombreux mystères.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "**⭐ Réputation**",
+          "▸ Mythique",
+          "▸ Associé aux Diables",
+          "▸ Considéré comme un mauvais présage",
+          "",
+          "**⭐ Particularités**",
+          "▸ Peut servir de lien avec le Monde Souterrain",
+          "▸ Possède souvent des capacités hors normes",
+          "▸ Très peu d'exemples existent dans l'Histoire",
+        ].join("\n"),
+      )
+      .setImage("https://static.wikia.nocookie.net/blackclover/images/a/a6/Five-Leaf_Clover_Grimoire.png/revision/latest?cb=20171219175914")
+      .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
+
+    if (existing) {
+      await existing.edit({ embeds: [embed] });
+      logger.info({ messageId: existing.id }, "Grimoire cinq feuilles mis à jour");
+      return;
+    }
+
+    const msg = await channel.send({ embeds: [embed] });
+    logger.info({ messageId: msg.id }, "Grimoire cinq feuilles posté avec succès");
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de la publication du grimoire cinq feuilles");
+  }
+}
+
+const LORE_EMBEDS = [
+  {
+    channelId: "1510658703785984191",
+    title: "📖 Les Grimoires",
+    color: 0xd4a017,
+    image: "https://static.wikia.nocookie.net/blackclover/images/8/88/Grimoires.png/revision/latest?cb=20170902112034",
+    description: [
+      "Les grimoires sont au cœur de la vie d'un mage. Plus qu'un simple livre, ils sont le reflet de l'âme, du potentiel et de la magie de leur propriétaire.",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Lors de la **Cérémonie d'Attribution des Grimoires**, généralement à l'âge de 15 ans, un grimoire choisit son futur utilisateur. Ce n'est pas le mage qui choisit son grimoire, mais le grimoire qui reconnaît son propriétaire.",
+      "",
+      "Une fois lié à son utilisateur, le grimoire l'accompagne toute sa vie et évolue avec lui.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510632003123286076",
+    title: "✨ Rôle du Grimoire",
+    color: 0xd4a017,
+    image: "https://static.wikia.nocookie.net/blackclover/images/8/88/Grimoires.png/revision/latest?cb=20170902112034",
+    description: [
+      "Le grimoire agit comme un **amplificateur magique**.",
+      "",
+      "Grâce à lui, un mage peut :",
+      "",
+      "▸ Développer de nouveaux sorts.",
+      "▸ Contrôler plus facilement sa magie.",
+      "▸ Augmenter la puissance de ses techniques.",
+      "▸ Découvrir de nouvelles capacités au fil de sa progression.",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "À mesure qu'un mage gagne en expérience, de nouvelles pages et de nouveaux sorts peuvent apparaître dans son grimoire.",
+      "",
+      "Chaque grimoire est unique, même entre deux personnes possédant la même magie.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510631883396874471",
+    title: "☘️ Grimoire à Trois Feuilles",
+    color: 0x27ae60,
+    image: "https://static.wikia.nocookie.net/blackclover/images/c/c7/Asta_Grimoire.png/revision/latest?cb=20171116172633",
+    description: [
+      "Les grimoires à trois feuilles sont les plus répandus dans le monde.",
+      "",
+      "Ils représentent :",
+      "▸ La Foi",
+      "▸ L'Espoir",
+      "▸ L'Amour",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "La majorité des mages possèdent ce type de grimoire.",
+      "",
+      "Contrairement à certaines idées reçues, un grimoire à trois feuilles n'est pas faible. De nombreux Capitaines et mages légendaires ont possédé des grimoires à trois feuilles.",
+      "",
+      "La puissance d'un mage dépend avant tout de son entraînement, de son intelligence et de sa maîtrise de la magie.",
+      "",
+      "**Réputation**",
+      "⭐ Très commun",
+      "⭐ Accessible à tous les statuts sociaux",
+      "⭐ Potentiel variable selon le mage",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510631485328195584",
+    title: "🍀 Grimoire à Quatre Feuilles",
+    color: 0xf1c40f,
+    image: "https://static.wikia.nocookie.net/blackclover/images/a/a8/Four-Leaf_Clover_Grimoire.png/revision/latest?cb=20171124134113",
+    description: [
+      "Les grimoires à quatre feuilles sont extrêmement rares.",
+      "",
+      "Ils représentent :",
+      "▸ La Foi",
+      "▸ L'Espoir",
+      "▸ L'Amour",
+      "▸ La Chance",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Ces grimoires apparaissent généralement chez des individus possédant un potentiel exceptionnel ou destinés à accomplir de grandes choses.",
+      "",
+      "Les détenteurs de grimoires à quatre feuilles sont souvent vus comme des prodiges. Cependant, posséder un tel grimoire n'assure pas automatiquement le succès — beaucoup d'attentes reposent sur leurs épaules.",
+      "",
+      "**Réputation**",
+      "⭐ Très rare",
+      "⭐ Symbole de talent exceptionnel",
+      "⭐ Souvent associé aux futures légendes",
+      "",
+      "**Particularités**",
+      "▸ Mana généralement supérieur à la moyenne.",
+      "▸ Grande facilité d'apprentissage.",
+      "▸ Potentiel magique extrêmement élevé.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510634338910208080",
+    title: "☠️ La Dark Triad",
+    color: 0x2c2f33,
+    image: "https://static.wikia.nocookie.net/blackclover/images/7/73/Dark_Triad.png/revision/latest?cb=20201017152516",
+    description: [
+      "La **Dark Triad** est l'un des groupes les plus dangereux jamais apparus dans le Royaume de Spade. Composée de trois frères et sœurs, elle est à l'origine de nombreuses expérimentations interdites liées aux Diables et à la magie du Monde Souterrain.",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Leur objectif principal est simple mais terrifiant :",
+      "",
+      "*« Briser les frontières entre le monde humain et le Monde Souterrain. »*",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510634254047121478",
+    title: "☠️ Dark Triad — Golden Era",
+    color: 0x2c2f33,
+    image: "https://static.wikia.nocookie.net/blackclover/images/7/73/Dark_Triad.png/revision/latest?cb=20201017152516",
+    description: [
+      "Dans cette **Golden Era**, la Dark Triad peut être utilisée comme :",
+      "",
+      "▸ Une menace encore cachée dans l'ombre",
+      "▸ Une organisation qui commence à influencer Spade",
+      "▸ Une légende encore inconnue du grand public",
+      "▸ Une future catastrophe en préparation",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Le monde ignore encore leur véritable impact…",
+      "",
+      "Mais leurs actions ont déjà commencé à changer l'équilibre du continent.",
+      "",
+      "Et lorsque leur plan se dévoilera, même les plus grands mages devront choisir un camp. ☠️❄️👑",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510634064741404812",
+    title: "☠️ Origines de la Dark Triad",
+    color: 0x2c2f33,
+    image: "https://static.wikia.nocookie.net/blackclover/images/7/73/Dark_Triad.png/revision/latest?cb=20201017152516",
+    description: [
+      "La Dark Triad est issue du **Royaume de Spade**.",
+      "",
+      "Ils ont grandi dans un environnement marqué par la guerre, les expériences magiques et la recherche de puissance absolue. Très tôt, ils ont été influencés par des forces démoniaques, jusqu'à conclure des **contrats avec des Diables Suprêmes**.",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Ces pactes leur ont permis d'obtenir une puissance bien au-delà des limites humaines.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510633985426980865",
+    title: "☠️ Objectifs de la Dark Triad",
+    color: 0x2c2f33,
+    image: "https://static.wikia.nocookie.net/blackclover/images/7/73/Dark_Triad.png/revision/latest?cb=20201017152516",
+    description: [
+      "La Dark Triad ne cherche pas seulement la puissance.",
+      "",
+      "Elle veut :",
+      "",
+      "▸ Ouvrir complètement les portes du Monde Souterrain",
+      "▸ Libérer les Diables sur le monde humain",
+      "▸ Remodeler la société selon la loi du plus fort",
+      "▸ Devenir des \"dieux\" au-dessus des humains",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510633912752148593",
+    title: "☠️ Actions de la Dark Triad",
+    color: 0x2c2f33,
+    image: "https://static.wikia.nocookie.net/blackclover/images/7/73/Dark_Triad.png/revision/latest?cb=20201017152516",
+    description: [
+      "Même avant leur apparition publique totale, leurs actions ont déjà causé :",
+      "",
+      "▸ Des expérimentations interdites sur des humains",
+      "▸ La création de soldats améliorés magiquement",
+      "▸ L'instabilité du Royaume de Spade",
+      "▸ Une augmentation des phénomènes liés aux Diables",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510633040584638534",
+    title: "🧬 Les Races",
+    color: 0x9b59b6,
+    image: "https://static.wikia.nocookie.net/blackclover/images/5/59/World_Map.png/revision/latest?cb=20181026012343",
+    description: [
+      "Dans le monde de **Black Clover**, la magie est présente chez toutes les espèces vivantes, mais chaque race possède ses propres particularités, forces et limites.",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Ces différences influencent énormément la puissance, la perception du mana et le potentiel magique.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510632972221550664",
+    title: "🧬 Les Races — Golden Era",
+    color: 0x9b59b6,
+    image: "https://static.wikia.nocookie.net/blackclover/images/5/59/World_Map.png/revision/latest?cb=20181026012343",
+    description: [
+      "Dans la **Golden Era**, toutes les races connaissent un pic de puissance et d'activité.",
+      "",
+      "▸ Les humains produisent des prodiges comme jamais auparavant.",
+      "▸ Les Elfes restants deviennent des figures presque mythiques.",
+      "▸ Les Nains et leurs créations attirent de plus en plus d'attention.",
+      "▸ Les Diables commencent à s'agiter dans l'ombre du Monde Souterrain.",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Le monde semble équilibré… mais fragile.",
+      "",
+      "Car plus les races deviennent puissantes, plus l'équilibre entre elles devient instable.",
+      "",
+      "Et dans cette époque dorée, chaque race peut devenir la clé de l'avenir du monde. ✨🧬⚔️",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510632893951639685",
+    title: "👤 Les Humains",
+    color: 0x3498db,
+    image: "https://static.wikia.nocookie.net/blackclover/images/c/c7/Asta_full_appearance.png/revision/latest?cb=20181027162133",
+    description: [
+      "Les humains sont la race dominante du continent.",
+      "",
+      "Ils vivent dans tous les royaumes et constituent la grande majorité de la population. Leur principal atout est leur **adaptabilité** : ils peuvent développer presque tous les types de magie existants.",
+      "",
+      "Cependant, leur niveau de mana varie énormément d'un individu à l'autre.",
+      "",
+      "**⚡ Caractéristiques**",
+      "▸ Grande diversité de magies",
+      "▸ Puissance dépendant de l'entraînement et du talent",
+      "▸ Accès aux grimoires à 15 ans",
+      "▸ Forte évolution possible avec l'expérience",
+      "",
+      "**📌 Points importants**",
+      "Un humain peut passer de faible à extrêmement puissant avec de la détermination et de l'entraînement. La plupart des Chevaliers-Mages sont humains.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510632819527778476",
+    title: "🧝 Les Elfes",
+    color: 0x2ecc71,
+    image: "https://static.wikia.nocookie.net/blackclover/images/2/24/Licht_full_appearance.png/revision/latest?cb=20190303211517",
+    description: [
+      "Les Elfes sont une ancienne race liée directement au mana.",
+      "",
+      "Ils possèdent naturellement une quantité de mana bien supérieure à celle des humains, ainsi qu'une connexion très fine avec la magie et la nature.",
+      "",
+      "Autrefois, ils vivaient en harmonie avec les humains, mais un événement tragique a conduit à leur quasi-disparition.",
+      "",
+      "**⚡ Caractéristiques**",
+      "▸ Mana extrêmement élevé",
+      "▸ Excellente maîtrise naturelle de la magie",
+      "▸ Grande sensibilité au mana environnant",
+      "▸ Magies souvent très puissantes et précises",
+      "",
+      "**📌 Points importants**",
+      "Les Elfes sont souvent considérés comme des êtres \"parfaits\" en termes de magie naturelle. Leur puissance dépasse largement celle des humains moyens.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510632752704131243",
+    title: "⛏️ Les Nains",
+    color: 0xe67e22,
+    image: "https://static.wikia.nocookie.net/blackclover/images/6/69/Dwarves.png/revision/latest?cb=20220101000000",
+    description: [
+      "Les Nains sont une race très mystérieuse et peu documentée.",
+      "",
+      "Ils vivent principalement dans des environnements souterrains et sont réputés pour leur savoir-faire exceptionnel dans la création d'objets magiques.",
+      "",
+      "**⚡ Caractéristiques**",
+      "▸ Très bons artisans magiques",
+      "▸ Maîtrise avancée de la forge et des objets enchantés",
+      "▸ Connexion particulière aux matériaux et aux minerais",
+      "",
+      "**📌 Points importants**",
+      "Même s'ils apparaissent rarement, les objets créés par les Nains sont souvent extrêmement puissants et recherchés.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510632589910610091",
+    title: "😈 Les Diables",
+    color: 0xed4245,
+    image: "https://static.wikia.nocookie.net/blackclover/images/f/f3/Zagred_appears.png/revision/latest?cb=20190714051040",
+    description: [
+      "Les Diables sont des êtres originaires du **Monde Souterrain**.",
+      "",
+      "Ils ne possèdent pas de corps physique comme les autres races et existent sous forme d'entités magiques extrêmement dangereuses.",
+      "",
+      "Chaque Diable possède une magie unique, souvent liée à des concepts destructeurs ou rares.",
+      "",
+      "**⚡ Caractéristiques**",
+      "▸ Magie extrêmement puissante et dangereuse",
+      "▸ Hiérarchie stricte dans le Monde Souterrain",
+      "▸ Peuvent conclure des contrats avec des humains",
+      "▸ Influencent fortement la magie des grimoires à 5 feuilles",
+      "",
+      "**📌 Points importants**",
+      "Plus un Diable est puissant, plus sa magie peut affecter le monde réel. Les Diables Suprêmes sont capables de menacer des nations entières.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510632297827799181",
+    title: "🧬 Hybrides & Cas Spéciaux",
+    color: 0x9b59b6,
+    image: "https://static.wikia.nocookie.net/blackclover/images/a/a6/Five-Leaf_Clover_Grimoire.png/revision/latest?cb=20171219175914",
+    description: [
+      "Dans certaines situations rares, il existe :",
+      "",
+      "▸ Des humains liés à des Diables (contrats)",
+      "▸ Des utilisateurs de magie corrompue",
+      "▸ Des cas de réincarnation d'Elfes dans des corps humains",
+      "▸ Des individus modifiés magiquement",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Ces cas sont extrêmement rares mais peuvent exister dans un univers RP.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510634640300314714",
+    title: "⚔️ Les Compagnies de Chevaliers-Mages",
+    color: 0xd4a017,
+    image: "https://static.wikia.nocookie.net/blackclover/images/f/fe/Magic_Knights_Captains_gathered.png/revision/latest?cb=20180528073649",
+    description: [
+      "Les Compagnies de Chevaliers-Mages représentent l'élite militaire du Royaume de Clover. Leur rôle est de protéger le royaume, accomplir des missions, combattre les menaces extérieures et maintenir l'ordre.",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Chaque compagnie possède sa propre identité, ses valeurs et sa manière de former ses membres. Bien qu'elles servent toutes le même royaume, certaines rivalités existent entre elles.",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510634588437741749",
+    title: "⚔️ Golden Era — L'Apogée des Compagnies",
+    color: 0xd4a017,
+    image: "https://static.wikia.nocookie.net/blackclover/images/f/fe/Magic_Knights_Captains_gathered.png/revision/latest?cb=20180528073649",
+    description: [
+      "Durant la **Golden Era**, les Compagnies de Chevaliers-Mages sont à leur apogée.",
+      "",
+      "La concurrence entre elles n'a jamais été aussi forte. Chaque compagnie cherche à recruter les meilleurs talents du royaume afin de renforcer son influence et sa renommée.",
+      "",
+      "De nombreux futurs Capitaines, héros et légendes se trouvent encore parmi leurs rangs, attendant simplement l'occasion de faire leurs preuves. ✨☘️⚔️",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510627322594721923",
+    title: "🦌 Aqua Deer",
+    color: 0x1abc9c,
+    image: "https://static.wikia.nocookie.net/blackclover/images/4/4c/Aqua_Deer_Squad.png/revision/latest?cb=20171116130116",
+    description: [
+      "*« La connaissance mène à la puissance. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "L'une des plus anciennes compagnies du royaume.",
+      "",
+      "Les Aqua Deer sont connus pour leur ouverture d'esprit et leur polyvalence. Ils cherchent constamment à développer de nouvelles façons d'utiliser la magie.",
+      "",
+      "Cette compagnie est souvent associée à la recherche, à l'expérimentation et à l'innovation magique.",
+      "",
+      "**Réputation**",
+      "⭐ Grande intelligence stratégique",
+      "⭐ Mages très polyvalents",
+      "⭐ Forte culture du savoir",
+      "",
+      "**Spécialité**",
+      "▸ Recherche magique",
+      "▸ Développement de nouveaux sorts",
+      "▸ Missions spécialisées",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510627221692481567",
+    title: "🐋 Purple Orcas",
+    color: 0x9b59b6,
+    image: "https://static.wikia.nocookie.net/blackclover/images/9/93/Purple_Orca_Squad.png/revision/latest?cb=20171116130210",
+    description: [
+      "*« La justice avant tout. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Les Purple Orcas sont souvent chargés de surveiller certaines régions du royaume et de maintenir la sécurité intérieure.",
+      "",
+      "Ils travaillent régulièrement avec les autorités locales et sont souvent impliqués dans des enquêtes importantes.",
+      "",
+      "**Réputation**",
+      "⭐ Compagnie sérieuse",
+      "⭐ Forte présence sur le territoire",
+      "⭐ Axée sur la sécurité",
+      "",
+      "**Spécialité**",
+      "▸ Maintien de l'ordre",
+      "▸ Enquêtes",
+      "▸ Protection des citoyens",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510627136602509313",
+    title: "🦚 Coral Peacocks",
+    color: 0xe91e8c,
+    image: "https://static.wikia.nocookie.net/blackclover/images/a/a5/Coral_Peacock_Squad.png/revision/latest?cb=20171116130140",
+    description: [
+      "*« La magie est un art. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Les Coral Peacocks regroupent de nombreux mages possédant des magies originales ou complexes.",
+      "",
+      "Ils sont connus pour leur créativité et leur capacité à utiliser la magie de manière unique.",
+      "",
+      "Beaucoup considèrent cette compagnie comme l'une des plus raffinées du royaume.",
+      "",
+      "**Réputation**",
+      "⭐ Très créative",
+      "⭐ Magies inhabituelles",
+      "⭐ Grande maîtrise technique",
+      "",
+      "**Spécialité**",
+      "▸ Illusions",
+      "▸ Contrôle du terrain",
+      "▸ Stratégies avancées",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510626662826512515",
+    title: "🦗 Green Mantis",
+    color: 0x2ecc71,
+    image: "https://static.wikia.nocookie.net/blackclover/images/6/6d/Green_Mantis_Squad.png/revision/latest?cb=20171116130158",
+    description: [
+      "*« Frappe vite, frappe fort. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Les Green Mantis possèdent une réputation assez particulière.",
+      "",
+      "Leurs membres sont souvent impulsifs, agressifs ou excentriques, mais également extrêmement efficaces lorsqu'il s'agit de combattre.",
+      "",
+      "Ils préfèrent généralement l'action à la réflexion et aiment affronter directement leurs adversaires.",
+      "",
+      "**Réputation**",
+      "⭐ Compagnie imprévisible",
+      "⭐ Très offensive",
+      "⭐ Esprit compétitif élevé",
+      "",
+      "**Spécialité**",
+      "▸ Combats rapides",
+      "▸ Traque des criminels",
+      "▸ Interventions d'urgence",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510625981675601921",
+    title: "🌹 Blue Rose Knights",
+    color: 0x3498db,
+    image: "https://static.wikia.nocookie.net/blackclover/images/3/3a/Blue_Rose_Squad.png/revision/latest?cb=20171116130124",
+    description: [
+      "*« La beauté réside dans la force. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Les Blue Rose Knights sont une compagnie principalement composée de femmes.",
+      "",
+      "Elles sont connues pour leur rigueur, leur élégance et leur efficacité au combat. Les membres doivent constamment faire preuve de discipline et d'excellence.",
+      "",
+      "Cette compagnie est particulièrement réputée pour ses stratégies et son travail d'équipe.",
+      "",
+      "**Réputation**",
+      "⭐ Grande discipline",
+      "⭐ Très bonne coordination",
+      "⭐ Forte cohésion entre membres",
+      "",
+      "**Spécialité**",
+      "▸ Missions tactiques",
+      "▸ Protection du territoire",
+      "▸ Travail d'équipe",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510625369328324638",
+    title: "🦁 Crimson Lion Kings",
+    color: 0xed4245,
+    image: "https://static.wikia.nocookie.net/blackclover/images/f/f8/Crimson_Lion_Squad.png/revision/latest?cb=20171116130148",
+    description: [
+      "*« La force forge la grandeur. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Les Crimson Lion Kings sont réputés pour leur puissance brute et leur courage.",
+      "",
+      "Ils valorisent avant tout la détermination, la volonté et la capacité à se dépasser. Peu importe votre origine sociale, si vous possédez la force et l'esprit d'un guerrier, vous pouvez y trouver votre place.",
+      "",
+      "Les membres de cette compagnie sont souvent les premiers à entrer sur un champ de bataille.",
+      "",
+      "**Réputation**",
+      "⭐ Très respectée par les combattants",
+      "⭐ Esprit de famille important",
+      "⭐ Forte culture du dépassement de soi",
+      "",
+      "**Spécialité**",
+      "▸ Combat frontal",
+      "▸ Offensive",
+      "▸ Guerre à grande échelle",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510625075869777981",
+    title: "🦅 Silver Eagles",
+    color: 0x95a5a6,
+    image: "https://static.wikia.nocookie.net/blackclover/images/0/0b/Silver_Eagle_Squad.png/revision/latest?cb=20171116130218",
+    description: [
+      "*« L'honneur et la noblesse. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Les Silver Eagles sont l'une des compagnies les plus respectées du royaume.",
+      "",
+      "Composée majoritairement de familles nobles, elle accorde une grande importance à la discipline, à l'élégance et au respect des traditions.",
+      "",
+      "Les membres sont formés dès leur plus jeune âge afin d'incarner l'image parfaite du Chevalier-Mage.",
+      "",
+      "**Réputation**",
+      "⭐ Très influente politiquement",
+      "⭐ Forte présence de nobles",
+      "⭐ Excellente discipline",
+      "",
+      "**Spécialité**",
+      "▸ Défense stratégique",
+      "▸ Maintien de l'ordre",
+      "▸ Missions officielles",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510622747473088583",
+    title: "🐂 Black Bulls",
+    color: 0x23272a,
+    image: "https://static.wikia.nocookie.net/blackclover/images/b/bc/Black_Bulls_Squad.png/revision/latest?cb=20171116130131",
+    description: [
+      "*« Peu importe qui tu es, tant que tu avances. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "Les Black Bulls sont connus pour être la compagnie la plus chaotique du royaume.",
+      "",
+      "Contrairement aux autres compagnies, ils recrutent souvent des individus rejetés ailleurs, possédant des magies inhabituelles ou des personnalités difficiles.",
+      "",
+      "À première vue, ils semblent désorganisés et incontrôlables. Pourtant, derrière cette image se cachent souvent des mages extrêmement puissants capables de réaliser l'impossible.",
+      "",
+      "Ils privilégient les résultats plutôt que les apparences.",
+      "",
+      "**Réputation**",
+      "▸ Très mauvaise réputation auprès des nobles",
+      "▸ Très populaire auprès des citoyens",
+      "▸ Compagnie la plus imprévisible",
+      "",
+      "**Spécialité**",
+      "▸ Missions dangereuses",
+      "▸ Situations inhabituelles",
+      "▸ Magies rares ou atypiques",
+    ].join("\n"),
+  },
+  {
+    channelId: "1510622649707925674",
+    title: "🌅 Golden Dawn",
+    color: 0xf1c40f,
+    image: "https://static.wikia.nocookie.net/blackclover/images/3/3e/Golden_Dawn_Squad.png/revision/latest?cb=20171116130200",
+    description: [
+      "*« L'excellence avant tout. »*",
+      "",
+      "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      "",
+      "La Golden Dawn est considérée comme la compagnie la plus prestigieuse du Royaume de Clover.",
+      "",
+      "Elle rassemble généralement les mages les plus talentueux, les plus disciplinés et ceux possédant un immense potentiel magique. Être accepté dans cette compagnie est un honneur recherché par de nombreux jeunes mages.",
+      "",
+      "Les membres de la Golden Dawn sont souvent envoyés sur les missions les plus importantes et représentent l'image idéale du Chevalier-Mage aux yeux de la population.",
+      "",
+      "**Réputation**",
+      "▸ Prestige exceptionnel",
+      "▸ Très respectée dans tout le royaume",
+      "▸ Nombreux nobles dans ses rangs",
+      "",
+      "**Spécialité**",
+      "▸ Missions importantes",
+      "▸ Défense du royaume",
+      "▸ Mages d'élite",
+    ].join("\n"),
+  },
+];
+
+async function postLoreEmbeds() {
+  for (const def of LORE_EMBEDS) {
+    try {
+      const channel = await client.channels.fetch(def.channelId);
+      if (!channel?.isTextBased()) {
+        logger.warn({ channelId: def.channelId }, "Salon lore introuvable ou non textuel");
+        continue;
+      }
+
+      const embed = new EmbedBuilder()
+        .setColor(def.color)
+        .setTitle(def.title)
+        .setDescription(def.description)
+        .setImage(def.image)
+        .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
+
+      const messages = await channel.messages.fetch({ limit: 20 });
+      const existing = messages.find(
+        (m) =>
+          m.author.id === client.user.id &&
+          m.embeds.length > 0 &&
+          m.embeds[0]?.title === def.title,
+      );
+
+      if (existing) {
+        await existing.edit({ embeds: [embed] });
+        logger.info({ channelId: def.channelId, title: def.title }, "Embed lore mis à jour");
+      } else {
+        await channel.send({ embeds: [embed] });
+        logger.info({ channelId: def.channelId, title: def.title }, "Embed lore posté");
+      }
+    } catch (err) {
+      logger.warn({ err, channelId: def.channelId }, "Erreur embed lore");
+    }
+  }
+}
+
+async function postEmbedMessages(guild) {
+  const allChannels = await guild.channels.fetch();
+  const textChannels = allChannels.filter(
+    (ch) => ch && ch.isTextBased() && !ch.isThread(),
+  );
+
+  for (const messageId of EMBED_MESSAGE_IDS) {
+    let foundMessage = null;
+    let foundChannel = null;
+
+    for (const [, ch] of textChannels) {
+      try {
+        foundMessage = await ch.messages.fetch(messageId);
+        foundChannel = ch;
+        break;
+      } catch {
+        // Message not in this channel, continue
+      }
+    }
+
+    if (!foundMessage) {
+      logger.warn({ messageId }, "Message introuvable pour embed");
+      continue;
+    }
+
+    if (!foundMessage.content && foundMessage.embeds.length === 0) {
+      logger.warn({ messageId }, "Message sans contenu à embedder");
+      continue;
+    }
+
+    // Skip if already an embed posted by the bot with this footer tag
+    const recent = await foundChannel.messages.fetch({ limit: 20 });
+    const alreadyEmbedded = recent.find(
+      (m) =>
+        m.author.id === client.user.id &&
+        m.embeds.length > 0 &&
+        m.embeds[0]?.footer?.text === `ref:${messageId}`,
+    );
+
+    if (alreadyEmbedded) {
+      // Update in case content changed
+      const updatedEmbed = new EmbedBuilder()
+        .setColor(0xd4a017)
+        .setDescription(foundMessage.content || null)
+        .setFooter({ text: `ref:${messageId}` });
+      await alreadyEmbedded.edit({ embeds: [updatedEmbed] });
+      logger.info({ messageId }, "Embed mis à jour");
+      continue;
+    }
+
+    const embed = new EmbedBuilder()
+      .setColor(0xd4a017)
+      .setDescription(foundMessage.content || null)
+      .setFooter({ text: `ref:${messageId}` });
+
+    await foundChannel.send({ embeds: [embed] });
+    logger.info({ messageId, channelId: foundChannel.id }, "Message embedé avec succès");
   }
 }
 
