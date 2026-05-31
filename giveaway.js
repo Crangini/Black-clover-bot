@@ -217,6 +217,7 @@ export function getGiveawayCommands() {
     new SlashCommandBuilder()
       .setName("giveaway")
       .setDescription("🎉 Lancer un giveaway")
+      .setDefaultMemberPermissions(0)
       .addStringOption((o) =>
         o.setName("nom").setDescription("Nom / prix du giveaway").setRequired(true),
       )
@@ -230,10 +231,12 @@ export function getGiveawayCommands() {
     new SlashCommandBuilder()
       .setName("giveaway-end")
       .setDescription("⏹️ Terminer le giveaway actif de ce salon immédiatement")
+      .setDefaultMemberPermissions(0)
       .toJSON(),
     new SlashCommandBuilder()
       .setName("reroll")
       .setDescription("🔄 Reroll un giveaway terminé")
+      .setDefaultMemberPermissions(0)
       .addStringOption((o) =>
         o
           .setName("giveaway")
@@ -438,4 +441,3 @@ export function handleGiveawayAutocomplete(interaction) {
     interaction.respond(choices).catch(() => null);
   }
 }
-
