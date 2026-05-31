@@ -37,6 +37,10 @@ const REGLEMENT_CHANNEL_ID = "1510239035782729760";
 const REGLEMENT_ROLE_ID = "1510238910481961013";
 let reglementMessageId = null;
 
+const LORE_CHANNEL_ID = "1510239036919250974";
+const MAP_CHANNEL_ID = "1510239118288752774";
+const CLOVER_LORE_CHANNEL_ID = "1510621132099948645";
+
 const pfcGames = new Map();
 
 const TICKET_CHANNEL_ID = "1510239134516514946";
@@ -214,6 +218,12 @@ const baseCommands = [
       o.setName("numero").setDescription("Numéro du warn à supprimer (voir /warnings)").setRequired(true).setMinValue(1),
     )
     .toJSON(),
+  new SlashCommandBuilder()
+    .setName("deletefiche")
+    .setDescription("Réinitialise la fiche RP d'un membre (staff uniquement)")
+    .setDefaultMemberPermissions(0)
+    .addUserOption((o) => o.setName("membre").setDescription("Le membre à réinitialiser").setRequired(true))
+    .toJSON(),
 ];
 
 const commands = [...baseCommands, ...getGiveawayCommands()];
@@ -230,9 +240,67 @@ async function sendLog(embed) {
   }
 }
 
+const FICHE_ROLE_IDS = [
+  "1510238701467467888","1510238702859718866","1510238704361275424","1510238705405657189",
+  "1510238706248974337","1510238708358578316","1510238709306490910","1510238710430437466",
+  "1510238711504441464","1510238713014386830","1510238714796707850","1510238715866513409",
+  "1510238717741240503","1510238720110891078","1510238723294363668","1510238724376760521",
+  "1510238725634920501","1510238726503137380","1510238727249723394","1510238728411545690",
+  "1510238729246212206","1510238730105913445","1510238731079127070",
+];
+const FICHE_GRADE_IDS = ["1510238735315239005","1510238736418340984","1510238737399939235","1510238738465423522"];
+const FICHE_ROYAUME_IDS = ["1510238741694775437","1510238742848344225","1510238744085532782","1510238745633230868","1510238747059552398"];
+const FICHE_ESPRIT_ID = "1510238749731328080";
+const FICHE_RACE_IDS = ["1510238752574931015","1510238753346556016","1510238754676412427","1510238755875983401","1510238756706193520"];
+const FICHE_SEXE_IDS = ["1510238758891421917","1510238760602697819"];
+const FICHE_COMPAGNIE_IDS = ["1510238762771152976","1510238763735978134","1510238765585530920","1510238767104000101","1510238768278409276","1510238769402609715","1510238770698518608","1510238771633721514","1510238772766179428"];
+const FICHE_GRIMOIRE_IDS = ["1510238775744401429","1510238777061146764","1510238778005127290","1510238779040989185","1510238780567851041","1510238781775810610"];
+const FICHE_REMOVE_ROLE = "1510238910481961013";
+const FICHE_ADD_ROLE = "1510238909806809098";
+const FICHE_DIVIDER_ROLES = ["1510238732354322444","1510238740658786354","1510238748334624939","1510238750867980448","1510238757931057292","1510238761462665409","1510238773626146948","1510238783117983875"];
+
 async function registerCommandsForGuild(guild, appId) {
   try {
-    await rest.put(Routes.applicationGuildCommands(appId, guild.id), { body: commands });
+    const guildRoles = await guild.roles.fetch();
+    const getRoleName = (id) => {
+      const r = guildRoles.get(id);
+      return r ? r.name.slice(0, 100) : `Rôle ${id}`;
+    };
+    const makeChoices = (ids) => ids.map((id) => ({ name: getRoleName(id), value: id }));
+
+    const createficheCmd = new SlashCommandBuilder()
+      .setName("createfiche")
+      .setDescription("Crée une fiche de personnage RP")
+      .addUserOption((o) =>
+        o.setName("membre").setDescription("Le membre concerné (toi par défaut, staff uniquement pour un autre)").setRequired(false),
+      )
+      .addStringOption((o) =>
+        o.setName("role").setDescription("Le rôle du personnage").setRequired(true).addChoices(...makeChoices(FICHE_ROLE_IDS)),
+      )
+      .addStringOption((o) =>
+        o.setName("grade").setDescription("Le grade de ton personnage").setRequired(true).addChoices(...makeChoices(FICHE_GRADE_IDS)),
+      )
+      .addStringOption((o) =>
+        o.setName("royaume").setDescription("Le royaume de ton personnage").setRequired(true).addChoices(...makeChoices(FICHE_ROYAUME_IDS)),
+      )
+      .addStringOption((o) =>
+        o.setName("race").setDescription("La race de ton personnage").setRequired(true).addChoices(...makeChoices(FICHE_RACE_IDS)),
+      )
+      .addStringOption((o) =>
+        o.setName("sexe").setDescription("Le sexe de ton personnage").setRequired(true).addChoices(...makeChoices(FICHE_SEXE_IDS)),
+      )
+      .addStringOption((o) =>
+        o.setName("esprit").setDescription("L'esprit de ton personnage (optionnel)").setRequired(false).addChoices({ name: getRoleName(FICHE_ESPRIT_ID), value: FICHE_ESPRIT_ID }),
+      )
+      .addStringOption((o) =>
+        o.setName("compagnie").setDescription("Ta compagnie de Chevaliers-Mages (optionnel)").setRequired(false).addChoices(...makeChoices(FICHE_COMPAGNIE_IDS)),
+      )
+      .addStringOption((o) =>
+        o.setName("grimoire").setDescription("Le type de grimoire de ton personnage (optionnel)").setRequired(false).addChoices(...makeChoices(FICHE_GRIMOIRE_IDS)),
+      )
+      .toJSON();
+
+    await rest.put(Routes.applicationGuildCommands(appId, guild.id), { body: [...commands, createficheCmd] });
     logger.info({ guildId: guild.id, guildName: guild.name }, "Commandes slash enregistrées");
   } catch (err) {
     logger.error({ err, guildId: guild.id }, "Erreur lors de l'enregistrement des commandes");
@@ -247,6 +315,9 @@ client.once("clientReady", async (c) => {
     await registerCommandsForGuild(guild, c.user.id);
   }
   await postReglement();
+  await postLore();
+  await postKingdomMap();
+  await postCloverLore();
   await postTicketEmbed();
 });
 
@@ -355,6 +426,10 @@ client.on("interactionCreate", async (interaction) => {
       await handlePfcButton(interaction);
       return;
     }
+    if (interaction.customId.startsWith("map_kingdom_")) {
+      await handleMapButton(interaction);
+      return;
+    }
     if (interaction.customId === "ticket_close") {
       await handleCloseTicket(interaction);
     } else if (interaction.customId === "ticket_close_confirm") {
@@ -436,8 +511,158 @@ client.on("interactionCreate", async (interaction) => {
     await handleWarnings(interaction);
   } else if (interaction.commandName === "removewarn") {
     await handleSupprimerWarn(interaction);
+  } else if (interaction.commandName === "createfiche") {
+    await handleCreatefiche(interaction);
+  } else if (interaction.commandName === "deletefiche") {
+    await handleDeletefiche(interaction);
   }
 });
+
+async function handleDeletefiche(interaction) {
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  if (!hasRole(interaction.member, MOD_ROLES)) {
+    await interaction.reply({ content: "❌ Tu n'as pas la permission d'utiliser cette commande.", ephemeral: true });
+    return;
+  }
+
+  const targetUser = interaction.options.getUser("membre");
+  const member = await guild.members.fetch(targetUser.id).catch(() => null);
+  if (!member) {
+    await interaction.reply({ content: "❌ Membre introuvable.", ephemeral: true });
+    return;
+  }
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const allFicheRoles = [
+    ...FICHE_ROLE_IDS,
+    ...FICHE_GRADE_IDS,
+    ...FICHE_ROYAUME_IDS,
+    FICHE_ESPRIT_ID,
+    ...FICHE_RACE_IDS,
+    ...FICHE_SEXE_IDS,
+    ...FICHE_COMPAGNIE_IDS,
+    ...FICHE_GRIMOIRE_IDS,
+    ...FICHE_DIVIDER_ROLES,
+    FICHE_ADD_ROLE,
+  ];
+
+  let removed = 0;
+  for (const id of allFicheRoles) {
+    if (member.roles.cache.has(id)) {
+      try {
+        await member.roles.remove(id);
+        removed++;
+      } catch {}
+    }
+  }
+
+  try {
+    await member.roles.add(FICHE_REMOVE_ROLE);
+  } catch {}
+
+  const embed = new EmbedBuilder()
+    .setColor(0xed4245)
+    .setTitle("🗑️ Fiche réinitialisée")
+    .setDescription(`La fiche RP de <@${targetUser.id}> a été supprimée.\n**${removed}** rôle(s) retiré(s). Le rôle de départ a été ré-attribué.`)
+    .setFooter({ text: `Par ${interaction.user.username}` })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+
+  await sendLog(
+    new EmbedBuilder()
+      .setColor(0xed4245)
+      .setTitle("🗑️ Fiche RP supprimée")
+      .addFields(
+        { name: "Membre", value: `<@${targetUser.id}> (${targetUser.tag})`, inline: true },
+        { name: "Staff", value: `<@${interaction.user.id}>`, inline: true },
+        { name: "Rôles retirés", value: `${removed}`, inline: true },
+      )
+      .setTimestamp(),
+  );
+}
+
+async function handleCreatefiche(interaction) {
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  await interaction.deferReply({ ephemeral: true });
+
+  const targetUser = interaction.options.getUser("membre");
+  const isForOther = targetUser && targetUser.id !== interaction.user.id;
+
+  if (isForOther && !hasRole(interaction.member, MOD_ROLES)) {
+    await interaction.editReply({ content: "❌ Seul le staff peut créer une fiche pour quelqu'un d'autre." });
+    return;
+  }
+
+  const memberId = targetUser ? targetUser.id : interaction.user.id;
+  const member = await guild.members.fetch(memberId).catch(() => null);
+  if (!member) {
+    await interaction.editReply({ content: "❌ Impossible de récupérer ce membre." });
+    return;
+  }
+
+  const roleId = interaction.options.getString("role");
+  const gradeId = interaction.options.getString("grade");
+  const royaumeId = interaction.options.getString("royaume");
+  const raceId = interaction.options.getString("race");
+  const sexeId = interaction.options.getString("sexe");
+  const espritId = interaction.options.getString("esprit");
+  const compagnieId = interaction.options.getString("compagnie");
+  const grimoireId = interaction.options.getString("grimoire");
+
+  const rolesToAdd = [roleId, gradeId, royaumeId, raceId, sexeId, ...FICHE_DIVIDER_ROLES];
+  if (espritId) rolesToAdd.push(espritId);
+  if (compagnieId) rolesToAdd.push(compagnieId);
+  if (grimoireId) rolesToAdd.push(grimoireId);
+  rolesToAdd.push(FICHE_ADD_ROLE);
+
+  const errors = [];
+
+  for (const id of rolesToAdd) {
+    try {
+      await member.roles.add(id);
+    } catch {
+      errors.push(id);
+    }
+  }
+
+  try {
+    await member.roles.remove(FICHE_REMOVE_ROLE);
+  } catch {}
+
+  const guildRoles = await guild.roles.fetch();
+  const getName = (id) => guildRoles.get(id)?.name ?? id;
+
+  const displayUser = targetUser ?? interaction.user;
+  const embed = new EmbedBuilder()
+    .setColor(0xd4a017)
+    .setTitle("✨ Fiche de personnage créée !")
+    .setThumbnail(displayUser.displayAvatarURL({ size: 128 }))
+    .setDescription(
+      isForOther
+        ? `La fiche de <@${displayUser.id}> a été créée avec succès par <@${interaction.user.id}>.`
+        : "Tes rôles ont été attribués avec succès. Bienvenue dans la Golden Era !",
+    )
+    .addFields(
+      { name: "⚔️ Rôle", value: `<@&${roleId}>`, inline: true },
+      { name: "🎖️ Grade", value: `<@&${gradeId}>`, inline: true },
+      { name: "🏰 Royaume", value: `<@&${royaumeId}>`, inline: true },
+      { name: "🧬 Race", value: `<@&${raceId}>`, inline: true },
+      { name: "🚻 Sexe", value: `<@&${sexeId}>`, inline: true },
+      ...(espritId ? [{ name: "🌊 Esprit", value: `<@&${espritId}>`, inline: true }] : []),
+      ...(compagnieId ? [{ name: "🛡️ Compagnie", value: `<@&${compagnieId}>`, inline: true }] : []),
+      ...(grimoireId ? [{ name: "📖 Grimoire", value: `<@&${grimoireId}>`, inline: true }] : []),
+    )
+    .setFooter({ text: "Black Clover RP — Golden Era 🍀" })
+    .setTimestamp();
+
+  await interaction.editReply({ embeds: [embed] });
+}
 
 async function handleLock(interaction) {
   if (!hasRole(interaction.member, MOD_ROLES)) {
@@ -1250,6 +1475,230 @@ async function handleClassement(interaction) {
   await interaction.reply({ embeds: [embed] });
 }
 
+async function postLore() {
+  try {
+    const channel = await client.channels.fetch(LORE_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      logger.warn({ channelId: LORE_CHANNEL_ID }, "Salon lore introuvable");
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 20 });
+    const existing = messages.find((m) => m.author.id === client.user.id && m.embeds.length > 0);
+
+    const loreEmbed = new EmbedBuilder()
+      .setColor(0xd4a017)
+      .setTitle("🏰✨ BLACK CLOVER RP — GOLDEN ERA ✨🏰")
+      .setDescription(
+        [
+          "*Bienvenue dans la Golden Era, l'âge d'or du Royaume de Clover.*",
+          "",
+          "Une époque où la magie n'a jamais été aussi puissante. Partout à travers le royaume, de nouveaux talents émergent, des grimoires exceptionnels apparaissent et les jeunes mages rêvent de rejoindre les rangs des prestigieux Ordres de Chevaliers-Mages.",
+          "",
+          "Le Royaume connaît actuellement une période de prospérité sans précédent. Les villes se développent, les frontières sont stables et les différents Ordres rivalisent pour former les futurs prodiges de demain. Beaucoup considèrent cette période comme le plus grand âge que la magie ait connu.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "Mais derrière cette apparente tranquillité, certaines rumeurs commencent à circuler…",
+          "",
+          "D'anciennes forces oubliées semblent s'agiter dans l'ombre. Des phénomènes magiques inexpliqués sont signalés aux quatre coins du continent. Des organisations secrètes gagneraient en influence tandis que certains individus poursuivraient des ambitions capables de bouleverser l'équilibre du monde.",
+          "",
+          "Pour l'instant, personne ne connaît réellement l'ampleur de ces menaces. Le peuple continue de vivre normalement et la majorité des mages se concentre sur sa progression, ses missions et sa renommée.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "Car aujourd'hui, **l'avenir appartient à ceux qui auront la force de le façonner.**",
+          "",
+          "Dans cette nouvelle ère, les plus grands mages de l'histoire sont encore à écrire. Certains deviendront des héros admirés dans tout le royaume. D'autres emprunteront un chemin plus sombre. Mais une chose est certaine : les événements qui façonneront le futur ont déjà commencé.",
+          "",
+          "*Le monde retient son souffle.*",
+          "*Et votre histoire commence maintenant.*",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "✨ **Serez-vous un simple mage parmi tant d'autres, ou l'une des légendes qui marqueront à jamais cette Golden Era ?** ✨",
+        ].join("\n"),
+      )
+      .setImage("https://i.pinimg.com/originals/e6/be/77/e6be774a7578e6967bfd44304b5bcd6d.gif")
+      .setFooter({ text: "Black Clover RP — Golden Era 🍀" })
+      .setTimestamp();
+
+    if (existing) {
+      await existing.edit({ embeds: [loreEmbed] });
+      logger.info({ messageId: existing.id }, "Lore mis à jour");
+      return;
+    }
+
+    const msg = await channel.send({ embeds: [loreEmbed] });
+    logger.info({ messageId: msg.id }, "Lore posté avec succès");
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de la publication du lore");
+  }
+}
+
+const KINGDOMS = {
+  clover: {
+    emoji: "☘️",
+    name: "Royaume de Clover",
+    color: 0x2ecc71,
+    desc: "Centre du monde magique. Siège des Chevaliers-Mages et des grandes compagnies. C'est ici que les plus grands mages de l'histoire ont forgé leur légende.",
+    style: "Prospère • Magie variée • Chevaliers-Mages",
+    lore: "Le Royaume de Clover est gouverné par le Roi et protégé par ses neuf Ordres de Chevaliers-Mages. La compétition entre les compagnies est féroce, et chaque mage rêve d'obtenir un grimoire digne des plus grands.",
+    image: "https://static.wikia.nocookie.net/blackclover/images/8/8e/Clover_Kingdom_layout.png/revision/latest?cb=20180604152547",
+  },
+  heart: {
+    emoji: "🌿",
+    name: "Royaume de Heart",
+    color: 0x27ae60,
+    desc: "Royaume en harmonie totale avec la nature et le mana naturel. Les esprits élémentaires y règnent en maîtres.",
+    style: "Nature • Mana pur • Esprits élémentaires",
+    lore: "Le Royaume de Heart est gouverné par la Princesse Lolopechka. Le peuple vit en symbiose avec les esprits de la nature, et le mana y est d'une pureté incomparable.",
+    image: "https://static.wikia.nocookie.net/blackclover/images/5/5f/Heart_Kingdom.png/revision/latest?cb=20191110101738",
+  },
+  diamond: {
+    emoji: "⚔️",
+    name: "Royaume de Diamond",
+    color: 0x3498db,
+    desc: "Nation militaire dominée par la recherche magique avancée et les expérimentations. Une puissance guerrière redoutée.",
+    style: "Science magique • Guerre • Expériences",
+    lore: "Le Royaume de Diamond est une monarchie militaire où la puissance magique détermine le rang social. Ses mages sont parmi les plus entraînés du continent, forgés par des années de conflits.",
+    image: null,
+  },
+  spade: {
+    emoji: "❄️",
+    name: "Royaume de Spade",
+    color: 0x9b59b6,
+    desc: "Terre froide et mystérieuse liée aux Diables et aux forces des ténèbres. Un royaume enveloppé de secrets.",
+    style: "Froid • Diables • Mystère",
+    lore: "Le Royaume de Spade est gouverné par la Maison Noire, trois mages de grande puissance. Les Diables y exercent une influence considérable, et des rumeurs circulent sur des pactes terrifiants conclus dans l'ombre.",
+    image: "https://static.wikia.nocookie.net/blackclover/images/1/11/Spade_Kingdom.png/revision/latest?cb=20200211155443",
+  },
+};
+
+async function postKingdomMap() {
+  try {
+    const channel = await client.channels.fetch(MAP_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      logger.warn({ channelId: MAP_CHANNEL_ID }, "Salon carte introuvable");
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 20 });
+    const existing = messages.find((m) => m.author.id === client.user.id && m.embeds.length > 0);
+
+    const mapEmbed = new EmbedBuilder()
+      .setColor(0xd4a017)
+      .setTitle("🗺️ Carte des Royaumes — Golden Era")
+      .setDescription(
+        [
+          "Le monde est vaste et chaque royaume possède sa propre identité magique.",
+          "Clique sur un bouton pour en apprendre davantage sur chaque territoire.",
+          "",
+          "☘️ **Clover** • 🌿 **Heart** • ⚔️ **Diamond** • ❄️ **Spade**",
+        ].join("\n"),
+      )
+      .setImage("https://i.pinimg.com/1200x/95/e1/87/95e1875137d7fcb271d80bb11903d425.jpg")
+      .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
+
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId("map_kingdom_clover").setLabel("Clover").setEmoji("☘️").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("map_kingdom_heart").setLabel("Heart").setEmoji("🌿").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("map_kingdom_diamond").setLabel("Diamond").setEmoji("⚔️").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("map_kingdom_spade").setLabel("Spade").setEmoji("❄️").setStyle(ButtonStyle.Secondary),
+    );
+
+    if (existing) {
+      await existing.edit({ embeds: [mapEmbed], components: [row] });
+      logger.info({ messageId: existing.id }, "Carte des royaumes mise à jour");
+      return;
+    }
+
+    const msg = await channel.send({ embeds: [mapEmbed], components: [row] });
+    logger.info({ messageId: msg.id }, "Carte des royaumes postée avec succès");
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de la publication de la carte");
+  }
+}
+
+async function postCloverLore() {
+  try {
+    const channel = await client.channels.fetch(CLOVER_LORE_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      logger.warn({ channelId: CLOVER_LORE_CHANNEL_ID }, "Salon lore Clover introuvable");
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 20 });
+    const existing = messages.find((m) => m.author.id === client.user.id && m.embeds.length > 0);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x2ecc71)
+      .setTitle("☘️ Royaume de Clover")
+      .setDescription(
+        [
+          "Le Royaume de Clover est l'une des plus grandes puissances du continent.",
+          "",
+          "Il est gouverné par une famille royale, mais sa véritable force repose sur ses **Chevaliers-Mages** qui assurent la défense du royaume contre les menaces extérieures.",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "**La société est divisée en plusieurs classes :**",
+          "",
+          "👑 Royauté",
+          "🏛️ Noblesse",
+          "🏘️ Citoyens",
+          "🌾 Paysans",
+          "",
+          "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+          "",
+          "Les familles nobles possèdent généralement davantage de mana et bénéficient d'une meilleure éducation magique. Malgré cela, de nombreux roturiers sont devenus des mages exceptionnels grâce à leur travail et leur détermination.",
+          "",
+          "*Clover est réputé pour la diversité de ses magies et le nombre impressionnant de talents qui émergent chaque génération.*",
+        ].join("\n"),
+      )
+      .setImage("https://static.wikia.nocookie.net/blackclover/images/8/8e/Clover_Kingdom_layout.png/revision/latest?cb=20180604152547")
+      .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
+
+    if (existing) {
+      await existing.edit({ embeds: [embed] });
+      logger.info({ messageId: existing.id }, "Lore Clover mis à jour");
+      return;
+    }
+
+    const msg = await channel.send({ embeds: [embed] });
+    logger.info({ messageId: msg.id }, "Lore Clover posté avec succès");
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de la publication du lore Clover");
+  }
+}
+
+async function handleMapButton(interaction) {
+  const key = interaction.customId.replace("map_kingdom_", "");
+  const kingdom = KINGDOMS[key];
+  if (!kingdom) return;
+
+  const embed = new EmbedBuilder()
+    .setColor(kingdom.color)
+    .setAuthor({ name: `${kingdom.emoji} ${kingdom.name}` })
+    .setDescription(
+      [
+        `*${kingdom.desc}*`,
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        "",
+        `📖 ${kingdom.lore}`,
+        "",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+      ].join("\n"),
+    )
+    .addFields({ name: "⚡ Ambiance", value: kingdom.style, inline: false })
+    .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
+
+  if (kingdom.image) embed.setImage(kingdom.image);
+
+  await interaction.reply({ embeds: [embed], ephemeral: true });
+}
+
 async function postReglement() {
   try {
     const channel = await client.channels.fetch(REGLEMENT_CHANNEL_ID);
@@ -1972,4 +2421,3 @@ process.on("unhandledRejection", (err) => {
 process.on("uncaughtException", (err) => {
   logger.error({ err }, "Exception non gérée");
 });
-
