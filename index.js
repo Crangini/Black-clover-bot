@@ -14,6 +14,7 @@ import {
   ChannelType,
   PermissionFlagsBits,
 } from "discord.js";
+import { createServer } from "node:http";
 import { logger } from "./lib/logger.js";
 import { tryGiveXp, getUserProgress, getLeaderboard, getUserRank } from "./xp.js";
 import { addWarning, getWarnings, removeWarning } from "./warnings.js";
@@ -96,6 +97,11 @@ function randomLevelUpGif() {
 }
 
 const TICKET_CATEGORY_ID = "1510256359361482994";
+const PARTENARIAT_TICKET_CATEGORY_ID = "1510972226730594304";
+const FICHE_TICKET_CHANNEL_ID = "1510970294754480180";
+const FICHE_TICKET_CATEGORY_ID = "1510971062559576084";
+const MAIN_GUILD_ID = "1510237336934285333";
+const SUPPORT_GUILD_ID = "1510970185685930004";
 const LOG_CHANNEL_ID = "1510239011279732848";
 
 const client = new Client({
@@ -108,6 +114,13 @@ const client = new Client({
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction],
 });
+
+const botSession = {
+  activatedBy: null,
+  activatedAt: null,
+  expiresAt: null,
+  timeoutId: null,
+};
 
 const baseCommands = [
   new SlashCommandBuilder()
@@ -258,6 +271,37 @@ const baseCommands = [
     .setDefaultMemberPermissions(0)
     .addUserOption((o) => o.setName("membre").setDescription("Le membre à réinitialiser").setRequired(true))
     .toJSON(),
+  new SlashCommandBuilder()
+    .setName("embed")
+    .setDescription("Envoie un embed personnalisé dans le salon (staff uniquement)")
+    .setDefaultMemberPermissions(0)
+    .addStringOption((o) =>
+      o.setName("texte").setDescription("Le texte à afficher dans l'embed").setRequired(true),
+    )
+    .addStringOption((o) =>
+      o.setName("couleur").setDescription("Couleur hex de l'embed (ex: FF0000 pour rouge)").setRequired(false),
+    )
+    .addStringOption((o) =>
+      o.setName("image").setDescription("URL de l'image à afficher dans l'embed").setRequired(false),
+    )
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName("activer")
+    .setDescription("Maintenir le bot en ligne pour une durée choisie (staff uniquement)")
+    .setDefaultMemberPermissions(0)
+    .addIntegerOption((o) =>
+      o
+        .setName("durée")
+        .setDescription("Durée en heures (1–1000)")
+        .setRequired(true)
+        .setMinValue(1)
+        .setMaxValue(1000),
+    )
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName("statut")
+    .setDescription("Affiche le statut et l'uptime du bot")
+    .toJSON(),
 ];
 
 const commands = [...baseCommands, ...getGiveawayCommands()];
@@ -295,7 +339,11 @@ const FICHE_DIVIDER_ROLES = ["1510238732354322444","1510238740658786354","151023
 
 async function registerCommandsForGuild(guild, appId) {
   try {
-    const guildRoles = await guild.roles.fetch();
+    const rolesSourceGuild =
+      guild.id === SUPPORT_GUILD_ID
+        ? (client.guilds.cache.get(MAIN_GUILD_ID) ?? guild)
+        : guild;
+    const guildRoles = await rolesSourceGuild.roles.fetch();
     const getRoleName = (id) => {
       const r = guildRoles.get(id);
       return r ? r.name.slice(0, 100) : `Rôle ${id}`;
@@ -358,6 +406,7 @@ client.once("clientReady", async (c) => {
   await postFiveLeafGrimoire();
   await postLoreEmbeds();
   await postTicketEmbed();
+  await postFicheTicketEmbed();
 });
 
 client.on("disconnect", () => {
@@ -454,9 +503,6 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   if (interaction.isStringSelectMenu()) {
-    if (interaction.customId === "ticket_select") {
-      await handleTicketSelect(interaction);
-    }
     return;
   }
 
@@ -467,6 +513,14 @@ client.on("interactionCreate", async (interaction) => {
     }
     if (interaction.customId.startsWith("map_kingdom_")) {
       await handleMapButton(interaction);
+      return;
+    }
+    if (interaction.customId === "partenariat_ticket_btn") {
+      await handleTicketSelect(interaction);
+      return;
+    }
+    if (interaction.customId === "fiche_ticket_btn") {
+      await handleFicheTicketSelect(interaction);
       return;
     }
     if (interaction.customId === "ticket_close") {
@@ -554,6 +608,12 @@ client.on("interactionCreate", async (interaction) => {
     await handleCreatefiche(interaction);
   } else if (interaction.commandName === "deletefiche") {
     await handleDeletefiche(interaction);
+  } else if (interaction.commandName === "activer") {
+    await handleActiver(interaction);
+  } else if (interaction.commandName === "statut") {
+    await handleStatut(interaction);
+  } else if (interaction.commandName === "embed") {
+    await handleEmbed(interaction);
   }
 });
 
@@ -627,8 +687,7 @@ async function handleDeletefiche(interaction) {
 
 
 async function handleCreatefiche(interaction) {
-  const guild = interaction.guild;
-  if (!guild) return;
+  if (!interaction.guild) return;
 
   await interaction.deferReply({ ephemeral: true });
 
@@ -640,10 +699,19 @@ async function handleCreatefiche(interaction) {
     return;
   }
 
+  const isCrossServer = interaction.guild.id === SUPPORT_GUILD_ID;
+  const mainGuild = isCrossServer
+    ? (client.guilds.cache.get(MAIN_GUILD_ID) ?? interaction.guild)
+    : interaction.guild;
+
   const memberId = targetUser ? targetUser.id : interaction.user.id;
-  const member = await guild.members.fetch(memberId).catch(() => null);
+  const member = await mainGuild.members.fetch(memberId).catch(() => null);
   if (!member) {
-    await interaction.editReply({ content: "❌ Impossible de récupérer ce membre." });
+    await interaction.editReply({
+      content: isCrossServer
+        ? "❌ Ce membre n'est pas présent sur le serveur principal."
+        : "❌ Impossible de récupérer ce membre.",
+    });
     return;
   }
 
@@ -676,7 +744,7 @@ async function handleCreatefiche(interaction) {
     await member.roles.remove(FICHE_REMOVE_ROLE);
   } catch {}
 
-  const guildRoles = await guild.roles.fetch();
+  const guildRoles = await mainGuild.roles.fetch();
   const getName = (id) => guildRoles.get(id)?.name ?? id;
 
   const displayUser = targetUser ?? interaction.user;
@@ -1744,7 +1812,7 @@ async function postHeartLore() {
           "*Un royaume où la nature et la magie ne forment qu'un.*",
         ].join("\n"),
       )
-      .setImage("https://static.wikia.nocookie.net/blackclover/images/5/5f/Heart_Kingdom.png/revision/latest?cb=20191110101738")
+      .setImage("https://images.openai.com/static-rsc-4/qgT8VtxHK76ViJa87jmGRIfi4mh1dzA8ET7zS3B2xM3JviPzXYen_5fnDH1tU8J1FJLtD5m2DmNuHaAGP-8HJbCZBUb-0t3eN19fwEMWB8FCzzCoNCTLkIsQSfpt6_F1I5MMzUP_ztXdoc5XCl69rGT46BxKNoHIjDcRTa5jeso?purpose=inline")
       .setThumbnail("https://static.wikia.nocookie.net/blackclover/images/3/3d/Heart_Kingdom_Symbol.png/revision/latest?cb=20200109174741")
       .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
 
@@ -1792,7 +1860,7 @@ async function postDiamondLore() {
           "*Un royaume forgé dans l'acier et le mana, où la puissance prime sur tout.*",
         ].join("\n"),
       )
-      .setImage("https://static.wikia.nocookie.net/blackclover/images/f/f5/Diamond_Kingdom_anime.png/revision/latest?cb=20181006164455")
+      .setImage("https://images.openai.com/static-rsc-4/xNvoQcf5Llb7tT6fZQWsn7TzU0iH2ZQAZeZ6GN1DjKG2-mVemAklV_pA1WYDDrxReDHgafbFcULKiVq5SZRMA9SuYSW-cvnBb1frUGNIkGGa16VcsxpHd6K8JM6K3AACEEdhbFteF6urTW-8r6CCQjI5ptc0wepkJitf2x6zyc4JpzdaIkbNQ19I71FX-_49?purpose=fullsize")
       .setThumbnail("https://static.wikia.nocookie.net/blackclover/images/2/2b/Diamond_Kingdom_Symbol.png/revision/latest?cb=20200109174746")
       .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
 
@@ -1902,7 +1970,7 @@ async function postFiveLeafGrimoire() {
           "▸ Très peu d'exemples existent dans l'Histoire",
         ].join("\n"),
       )
-      .setImage("https://static.wikia.nocookie.net/blackclover/images/a/a6/Five-Leaf_Clover_Grimoire.png/revision/latest?cb=20171219175914")
+      .setImage("https://i.pinimg.com/originals/45/38/18/4538186a64ea5965583cba1772439297.gif")
       .setFooter({ text: "Black Clover RP — Golden Era 🍀" });
 
     if (existing) {
@@ -1935,10 +2003,23 @@ const LORE_EMBEDS = [
     ].join("\n"),
   },
   {
+    channelId: "1510632069112529036",
+    title: "📖 Les Grimoires",
+    color: 0xd4a017,
+    image: "https://i.pinimg.com/originals/70/8d/50/708d50515a244dfb6526b753d68d2070.gif",
+    description: [
+      "Les grimoires sont au cœur de la vie d'un mage. Plus qu'un simple livre, ils sont le reflet de l'âme, du potentiel et de la magie de leur propriétaire.",
+      "",
+      "Lors de la **Cérémonie d'Attribution des Grimoires**, généralement à l'âge de 15 ans, un grimoire choisit son futur utilisateur. Ce n'est pas le mage qui choisit son grimoire, mais le grimoire qui reconnaît son propriétaire.",
+      "",
+      "Une fois lié à son utilisateur, le grimoire l'accompagne toute sa vie et évolue avec lui.",
+    ].join("\n"),
+  },
+  {
     channelId: "1510632003123286076",
     title: "✨ Rôle du Grimoire",
     color: 0xd4a017,
-    image: "https://static.wikia.nocookie.net/blackclover/images/8/88/Grimoires.png/revision/latest?cb=20170902112034",
+    image: "https://i.pinimg.com/originals/11/65/89/116589a243a3482f21dbe829955048e6.gif",
     description: [
       "Le grimoire agit comme un **amplificateur magique**.",
       "",
@@ -1960,7 +2041,7 @@ const LORE_EMBEDS = [
     channelId: "1510631883396874471",
     title: "☘️ Grimoire à Trois Feuilles",
     color: 0x27ae60,
-    image: "https://static.wikia.nocookie.net/blackclover/images/c/c7/Asta_Grimoire.png/revision/latest?cb=20171116172633",
+    image: "https://i.pinimg.com/1200x/b3/0e/53/b30e534adbd9e3560bb27c32def42d41.jpg",
     description: [
       "Les grimoires à trois feuilles sont les plus répandus dans le monde.",
       "",
@@ -1987,7 +2068,7 @@ const LORE_EMBEDS = [
     channelId: "1510631485328195584",
     title: "🍀 Grimoire à Quatre Feuilles",
     color: 0xf1c40f,
-    image: "https://static.wikia.nocookie.net/blackclover/images/a/a8/Four-Leaf_Clover_Grimoire.png/revision/latest?cb=20171124134113",
+    image: "https://i.pinimg.com/originals/83/9a/85/839a8592b3eff3540ddd0df261f7c0ad.gif",
     description: [
       "Les grimoires à quatre feuilles sont extrêmement rares.",
       "",
@@ -2018,7 +2099,7 @@ const LORE_EMBEDS = [
     channelId: "1510634338910208080",
     title: "☠️ La Dark Triad",
     color: 0x2c2f33,
-    image: "https://static.wikia.nocookie.net/blackclover/images/7/73/Dark_Triad.png/revision/latest?cb=20201017152516",
+    image: "https://images.openai.com/static-rsc-4/20q6pUZLGjTog7PEzBfxWTzTpvmmbkvlyINrkVvbZnbywT-TPGZm0S2mk4R7XxiZqEw6T5PAG8K98zFZOXGSTLGomPK82SG8Yssjr3NgNjHlmaY97IWh18T7eSMXQ0KP9Kddp9x1S4jLutOEFMEF_wKLtwE52DzjmAdFFOSxd9k?purpose=inline",
     description: [
       "La **Dark Triad** est l'un des groupes les plus dangereux jamais apparus dans le Royaume de Spade. Composée de trois frères et sœurs, elle est à l'origine de nombreuses expérimentations interdites liées aux Diables et à la magie du Monde Souterrain.",
       "",
@@ -2100,7 +2181,7 @@ const LORE_EMBEDS = [
     channelId: "1510633040584638534",
     title: "🧬 Les Races",
     color: 0x9b59b6,
-    image: "https://static.wikia.nocookie.net/blackclover/images/5/59/World_Map.png/revision/latest?cb=20181026012343",
+    image: "https://images.openai.com/static-rsc-4/yXyBdNBT393UuZjA0ibzEJ9ei4DC51c9djaIivt4s7FnYrBm7N7aiJ3SjCg4VlHVP_m0GVNIA7isvemzn5jYNMIMkAKikwgT9qFBi-Vd1B6q-ot2gkacUv74H9gBfIEBAJAARK-h0uYSAHEWdF4LtM050LZYbfWs6MI3f2PMw6k?purpose=inline",
     description: [
       "Dans le monde de **Black Clover**, la magie est présente chez toutes les espèces vivantes, mais chaque race possède ses propres particularités, forces et limites.",
       "",
@@ -2135,7 +2216,7 @@ const LORE_EMBEDS = [
     channelId: "1510632893951639685",
     title: "👤 Les Humains",
     color: 0x3498db,
-    image: "https://static.wikia.nocookie.net/blackclover/images/c/c7/Asta_full_appearance.png/revision/latest?cb=20181027162133",
+    image: "https://images.openai.com/static-rsc-4/3WAIy_-9OuuSuqbnFHnt5DQpA4vcnpqaON_13eJYUE4Ze1VPOHvkm_1dC28V1E2N77JvgsL9ic_HFTCGD8Y17aFDGcu9ke7qwt9GPah74_XiBPcf2wJ8UqYZCFxYu0wwjGd1ckh8Vun3DUs4AdVqdL3oYp2d2Etxdx1s-DdRrSY?purpose=inline",
     description: [
       "Les humains sont la race dominante du continent.",
       "",
@@ -2157,7 +2238,7 @@ const LORE_EMBEDS = [
     channelId: "1510632819527778476",
     title: "🧝 Les Elfes",
     color: 0x2ecc71,
-    image: "https://static.wikia.nocookie.net/blackclover/images/2/24/Licht_full_appearance.png/revision/latest?cb=20190303211517",
+    image: "https://images.openai.com/static-rsc-4/couHetfkPFvCBy63mGPdZF5buIYPqp9ee8YLR-y8tTr0V8Ivd15NFQwCReYGCR8SQPgkyG70gzjA2jwDuPYwzLxeXqwWQaBLEOxZ22YiVAr_5SgZJepLd-kIvWWgTQNvOJAnugYMU6lS38YktVKvEWcxEZwOy2eOhB-DUM8GAR4?purpose=inline",
     description: [
       "Les Elfes sont une ancienne race liée directement au mana.",
       "",
@@ -2198,7 +2279,7 @@ const LORE_EMBEDS = [
     channelId: "1510632589910610091",
     title: "😈 Les Diables",
     color: 0xed4245,
-    image: "https://static.wikia.nocookie.net/blackclover/images/f/f3/Zagred_appears.png/revision/latest?cb=20190714051040",
+    image: "https://images.openai.com/static-rsc-4/RFc-jDIppSIK1KxuUtW2S7RO6E8YnT8DFvUbfF9kWNdUpy6DdfWGT2vXmsfGTwQYIuFGEXGFZXVdRcjL3ZUKByEBh_N-WiDtNMIn5iZ7bOmqDvJBHcahGdcFR0M4h-QZxVZlkDFV8qm9mA8m6DHDH_MMKyEi34arFcTU0CNG_II?purpose=inline",
     description: [
       "Les Diables sont des êtres originaires du **Monde Souterrain**.",
       "",
@@ -2238,7 +2319,7 @@ const LORE_EMBEDS = [
     channelId: "1510634640300314714",
     title: "⚔️ Les Compagnies de Chevaliers-Mages",
     color: 0xd4a017,
-    image: "https://static.wikia.nocookie.net/blackclover/images/f/fe/Magic_Knights_Captains_gathered.png/revision/latest?cb=20180528073649",
+    image: "https://i.pinimg.com/originals/7c/42/49/7c42497b2cd434ee4a557e784ef7acb8.gif",
     description: [
       "Les Compagnies de Chevaliers-Mages représentent l'élite militaire du Royaume de Clover. Leur rôle est de protéger le royaume, accomplir des missions, combattre les menaces extérieures et maintenir l'ordre.",
       "",
@@ -2251,7 +2332,7 @@ const LORE_EMBEDS = [
     channelId: "1510634588437741749",
     title: "⚔️ Golden Era — L'Apogée des Compagnies",
     color: 0xd4a017,
-    image: "https://static.wikia.nocookie.net/blackclover/images/f/fe/Magic_Knights_Captains_gathered.png/revision/latest?cb=20180528073649",
+    image: "https://i.pinimg.com/originals/1d/f6/14/1df614dd4ec6d3447f1c430a0d8d82a9.gif",
     description: [
       "Durant la **Golden Era**, les Compagnies de Chevaliers-Mages sont à leur apogée.",
       "",
@@ -2264,7 +2345,7 @@ const LORE_EMBEDS = [
     channelId: "1510627322594721923",
     title: "🦌 Aqua Deer",
     color: 0x1abc9c,
-    image: "https://static.wikia.nocookie.net/blackclover/images/4/4c/Aqua_Deer_Squad.png/revision/latest?cb=20171116130116",
+    image: "https://images.openai.com/static-rsc-4/yD1B_1IYwcruK2Y9tPOWlTP3pds4s2jJz91JH5kJ2_ERgcfPpkhWbZPDfgjciULFhI3xPoYicTYPLX0VPdghToStw2VE6LB5tdMgxnK7eP0T4CBWaCq-w48IAupf4NQ6ne7vbPlKyA_CX70Nqvqrq_wSxmduGkoPjaPSDiUEvDY?purpose=inline",
     description: [
       "*« La connaissance mène à la puissance. »*",
       "",
@@ -2291,7 +2372,7 @@ const LORE_EMBEDS = [
     channelId: "1510627221692481567",
     title: "🐋 Purple Orcas",
     color: 0x9b59b6,
-    image: "https://static.wikia.nocookie.net/blackclover/images/9/93/Purple_Orca_Squad.png/revision/latest?cb=20171116130210",
+    image: "https://images.openai.com/static-rsc-4/Zvcjg29efM4SNJWBJW5YXz8j6tSXopoVDXmLlbk8b_tyByWv2ofMamoLCXv22qzcEKu0pw-NcBOdOKzb09ha_SyIv3_OWFwMKxVEGwX_op28BFk4cf2D5ra-A-Q4E_BrPVHB3U26LlBmNnrHERRWERmo0Go6dFhQevhvJIyEN00?purpose=inline",
     description: [
       "*« La justice avant tout. »*",
       "",
@@ -2316,7 +2397,7 @@ const LORE_EMBEDS = [
     channelId: "1510627136602509313",
     title: "🦚 Coral Peacocks",
     color: 0xe91e8c,
-    image: "https://static.wikia.nocookie.net/blackclover/images/a/a5/Coral_Peacock_Squad.png/revision/latest?cb=20171116130140",
+    image: "https://images.openai.com/static-rsc-4/fsQ176UZJ1emPVj2ruJFPVlVsSfqE-ZNuL4n8Q0vNXx71ta-bvqBeJrrWEYKVOJXD-xIRYYMclSq7Ls_sIUteVyg4398JdrS1tR5A7iVLE2HBLs2Y3oYPOtAJz4mnooukCTmCbINAer6PtAsyBzIg9zdgpA0nFxO_VtxtpUBsfo?purpose=inline",
     description: [
       "*« La magie est un art. »*",
       "",
@@ -2343,7 +2424,7 @@ const LORE_EMBEDS = [
     channelId: "1510626662826512515",
     title: "🦗 Green Mantis",
     color: 0x2ecc71,
-    image: "https://static.wikia.nocookie.net/blackclover/images/6/6d/Green_Mantis_Squad.png/revision/latest?cb=20171116130158",
+    image: "https://images.openai.com/static-rsc-4/1jgpNjkxOe8d_ssP0jK0-gkhC86CNcyM6IVWLGWNYz4n5oq7p9sIZAMnyWJ-EZoiELiP9VvIBBFiOqNisE6zw0769McXek_xFU8Nf4bCdRgQYIEKNDUMWSa3adimwGTymb67UqnwVW04HDtKtCwp4O5OhbODxtZ9Do4chJpxPik?purpose=inline",
     description: [
       "*« Frappe vite, frappe fort. »*",
       "",
@@ -2370,7 +2451,7 @@ const LORE_EMBEDS = [
     channelId: "1510625981675601921",
     title: "🌹 Blue Rose Knights",
     color: 0x3498db,
-    image: "https://static.wikia.nocookie.net/blackclover/images/3/3a/Blue_Rose_Squad.png/revision/latest?cb=20171116130124",
+    image: "https://images.openai.com/static-rsc-4/V6GsuOhHC8m4pUARWzN9AF0CPLgs3Q7_6_vrh1AJit0ucki-ySsIx-6kMxyxHVjljtQv0tOSUdDRvJoRcKwZ7BYdCixfbN3quv2vgoG00PK-I_L9CozahonVUpORCu-U19a1MKNQtlglILC6XXqxPIIaC-Qzp5FQHSnJhLVaioA?purpose=inline",
     description: [
       "*« La beauté réside dans la force. »*",
       "",
@@ -2397,7 +2478,7 @@ const LORE_EMBEDS = [
     channelId: "1510625369328324638",
     title: "🦁 Crimson Lion Kings",
     color: 0xed4245,
-    image: "https://static.wikia.nocookie.net/blackclover/images/f/f8/Crimson_Lion_Squad.png/revision/latest?cb=20171116130148",
+    image: "https://images.openai.com/static-rsc-4/Kn-F-X4fRJCF4bePEXb2DXMrKW7KZLFaxFcswAHNuLNGbQeBZ5-YSzb4dnPpkax-u7lPVym2UWgaeif-nZlJTiTN2ktRT06udr9GAq75j97V5OQJcPK4eZr29YO9rN6Kff4-ix6sHXH3ztUl4fr1eVpZ_62vgHCSq75jvygniv0?purpose=inline",
     description: [
       "*« La force forge la grandeur. »*",
       "",
@@ -2424,7 +2505,7 @@ const LORE_EMBEDS = [
     channelId: "1510625075869777981",
     title: "🦅 Silver Eagles",
     color: 0x95a5a6,
-    image: "https://static.wikia.nocookie.net/blackclover/images/0/0b/Silver_Eagle_Squad.png/revision/latest?cb=20171116130218",
+    image: "https://images.openai.com/static-rsc-4/oEBrKmlPZ834pwjJHuyobGw5EgNmfXx7D8r8LnPu5GLATAdhFBPrvHg66ZumMHM8lx2b6KLIgaroIdyAhmHcTbVMDm3AeodbKMEFwSTAP8GxviFlJJs6zrZ4vXm4ogdFW777R9dYCayCtt3b7a1aNJWKpYbSgJYrdnubzCMMct4?purpose=inline",
     description: [
       "*« L'honneur et la noblesse. »*",
       "",
@@ -2451,7 +2532,7 @@ const LORE_EMBEDS = [
     channelId: "1510622747473088583",
     title: "🐂 Black Bulls",
     color: 0x23272a,
-    image: "https://static.wikia.nocookie.net/blackclover/images/b/bc/Black_Bulls_Squad.png/revision/latest?cb=20171116130131",
+    image: "https://images.openai.com/static-rsc-4/hrjcVWs22XOzaB4IFVklGNBc4e5xtVv67j3zGjfKZKevidvhC64By1wO6iKV5jEoCGywVdWPPLlhtdlMwnBtjmg0JgNWQ1E4yyAlDQeuS-MS08TSSzhSVMxPFCGzUjLkSdiAt2rlT4sHVOsTOmHqV4crNahgeSWyfLtLWfOZLVo?purpose=inline",
     description: [
       "*« Peu importe qui tu es, tant que tu avances. »*",
       "",
@@ -2480,7 +2561,7 @@ const LORE_EMBEDS = [
     channelId: "1510622649707925674",
     title: "🌅 Golden Dawn",
     color: 0xf1c40f,
-    image: "https://static.wikia.nocookie.net/blackclover/images/3/3e/Golden_Dawn_Squad.png/revision/latest?cb=20171116130200",
+    image: "https://images.openai.com/static-rsc-4/oNxGbi6DBL-9d-a-CbRN6uCU4o61steNC6VRYQTIpjn_MeWVq5xTn5RLyVB7MGs0sjWoh-xmfaEwfgMpipK8rfYT2GwwnaDBtxy2hWuh-DR2R7KbyJzA_qmC_X2Sb4a6F6H4eU_5U0ehZhRFnWs2xvw9DaRruWrCIUeQWYB8oB0?purpose=inline",
     description: [
       "*« L'excellence avant tout. »*",
       "",
@@ -2542,6 +2623,10 @@ async function postLoreEmbeds() {
   }
 }
 
+const EMBED_MESSAGE_IMAGES = {
+  "1510632069112529036": "https://i.pinimg.com/originals/70/8d/50/708d50515a244dfb6526b753d68d2070.gif",
+};
+
 async function postEmbedMessages(guild) {
   const allChannels = await guild.channels.fetch();
   const textChannels = allChannels.filter(
@@ -2583,11 +2668,12 @@ async function postEmbedMessages(guild) {
 
     if (alreadyEmbedded) {
       // Update in case content changed
-      const updatedEmbed = new EmbedBuilder()
+      const updatedEmbedBuilder = new EmbedBuilder()
         .setColor(0xd4a017)
         .setDescription(foundMessage.content || null)
         .setFooter({ text: `ref:${messageId}` });
-      await alreadyEmbedded.edit({ embeds: [updatedEmbed] });
+      if (EMBED_MESSAGE_IMAGES[messageId]) updatedEmbedBuilder.setImage(EMBED_MESSAGE_IMAGES[messageId]);
+      await alreadyEmbedded.edit({ embeds: [updatedEmbedBuilder] });
       logger.info({ messageId }, "Embed mis à jour");
       continue;
     }
@@ -2596,6 +2682,7 @@ async function postEmbedMessages(guild) {
       .setColor(0xd4a017)
       .setDescription(foundMessage.content || null)
       .setFooter({ text: `ref:${messageId}` });
+    if (EMBED_MESSAGE_IMAGES[messageId]) embed.setImage(EMBED_MESSAGE_IMAGES[messageId]);
 
     await foundChannel.send({ embeds: [embed] });
     logger.info({ messageId, channelId: foundChannel.id }, "Message embedé avec succès");
@@ -2787,34 +2874,26 @@ async function postTicketEmbed() {
     const messages = await channel.messages.fetch({ limit: 10 });
     const existing = messages.find((m) => m.author.id === client.user.id && m.components.length > 0);
 
-    if (existing) {
-      logger.info("Embed ticket déjà posté");
-      return;
-    }
-
     const embed = new EmbedBuilder()
       .setColor(0x000000)
       .setTitle("🎟️ Ouvrir un ticket")
-      .setDescription("Quelle est la raison de ton ticket ?\nSélectionne une option dans le menu ci-dessous.")
+      .setDescription("Tu souhaites proposer un partenariat avec un autre serveur ?\nClique sur le bouton ci-dessous pour ouvrir un ticket.")
       .setFooter({ text: "Un salon privé sera créé pour toi." });
 
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId("ticket_select")
-      .setPlaceholder("Choisir une raison...")
-      .addOptions(
-        {
-          label: "Fiche",
-          value: "fiche",
-          description: "Soumettre ou modifier ta fiche de personnage",
-          emoji: "📋",
-        },
-        { label: "Partenariat", value: "partenariat", description: "Proposer un partenariat avec un autre serveur", emoji: "🤝" },
-        { label: "Autre", value: "autre", description: "Toute autre demande ou question", emoji: "💬" },
-      );
+    const btn = new ButtonBuilder()
+      .setCustomId("partenariat_ticket_btn")
+      .setLabel("🤝 Partenariat")
+      .setStyle(ButtonStyle.Secondary);
 
-    const row = new ActionRowBuilder().addComponents(menu);
-    await channel.send({ embeds: [embed], components: [row] });
-    logger.info("Embed ticket posté avec succès");
+    const row = new ActionRowBuilder().addComponents(btn);
+
+    if (existing) {
+      await existing.edit({ embeds: [embed], components: [row] });
+      logger.info("Embed ticket mis à jour");
+    } else {
+      await channel.send({ embeds: [embed], components: [row] });
+      logger.info("Embed ticket posté avec succès");
+    }
   } catch (err) {
     logger.error({ err }, "Erreur lors de la publication de l'embed ticket");
   }
@@ -2824,25 +2903,27 @@ async function handleTicketSelect(interaction) {
   const guild = interaction.guild;
   if (!guild) return;
 
-  const choice = interaction.values[0];
-  const labels = { fiche: "Fiche", partenariat: "Partenariat", autre: "Autre" };
-  const label = labels[choice];
   const pseudo = interaction.user.username;
-  const channelName = `${label.toLowerCase()}-${pseudo}`.toLowerCase().replace(/\s+/g, "-");
+  const channelName = `partenariat-${pseudo}`.toLowerCase().replace(/\s+/g, "-");
 
   await interaction.deferReply({ ephemeral: true });
 
   try {
-    const existing = guild.channels.cache.find((ch) => ch.name === channelName);
-    if (existing) {
-      await interaction.editReply({ content: `Tu as déjà un ticket ouvert : <#${existing.id}>` });
-      return;
+    const cached = guild.channels.cache.find((ch) => ch.name === channelName);
+    if (cached) {
+      try {
+        await guild.channels.fetch(cached.id);
+        await interaction.editReply({ content: `Tu as déjà un ticket ouvert : <#${cached.id}>` });
+        return;
+      } catch {
+        // Salon supprimé mais encore dans le cache — on continue la création
+      }
     }
 
     const ticketChannel = await guild.channels.create({
       name: channelName,
       type: ChannelType.GuildText,
-      parent: TICKET_CATEGORY_ID,
+      parent: PARTENARIAT_TICKET_CATEGORY_ID,
       permissionOverwrites: [
         { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
         {
@@ -2852,16 +2933,11 @@ async function handleTicketSelect(interaction) {
       ],
     });
 
-    const roleMention =
-      choice === "partenariat"
-        ? `<@&1510238694345281567>`
-        : choice === "fiche"
-          ? `<@&1510238696379519057>`
-          : null;
+    const roleMention = `<@&1510238694345281567>`;
 
     const ticketEmbed = new EmbedBuilder()
       .setColor(0x000000)
-      .setTitle(`🎟️ Ticket — ${label}`)
+      .setTitle("🎟️ Ticket — Partenariat")
       .setDescription(
         `Bienvenue ${interaction.user} !\n\nUn membre du staff va te répondre rapidement. Explique ta demande en détail ci-dessous.`,
       )
@@ -2874,9 +2950,8 @@ async function handleTicketSelect(interaction) {
       .setStyle(ButtonStyle.Danger);
 
     const btnRow = new ActionRowBuilder().addComponents(closeBtn);
-    const content = roleMention ? `${interaction.user} ${roleMention}` : `${interaction.user}`;
 
-    await ticketChannel.send({ content, embeds: [ticketEmbed], components: [btnRow] });
+    await ticketChannel.send({ content: `${interaction.user} ${roleMention}`, embeds: [ticketEmbed], components: [btnRow] });
 
     await sendLog(
       new EmbedBuilder()
@@ -2884,16 +2959,124 @@ async function handleTicketSelect(interaction) {
         .setTitle("🎟️ Ticket ouvert")
         .addFields(
           { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: true },
-          { name: "Raison", value: label, inline: true },
+          { name: "Raison", value: "Partenariat", inline: true },
           { name: "Salon", value: `<#${ticketChannel.id}>`, inline: true },
         )
         .setTimestamp(),
     );
 
     await interaction.editReply({ content: `✅ Ton ticket a été créé : <#${ticketChannel.id}>` });
-    logger.info({ userId: interaction.user.id, channelName, choice }, "Ticket créé");
+    logger.info({ userId: interaction.user.id, channelName }, "Ticket partenariat créé");
   } catch (err) {
     logger.error({ err, userId: interaction.user.id }, "Erreur lors de la création du ticket");
+    await interaction.editReply({ content: "❌ Une erreur est survenue lors de la création du ticket." });
+  }
+}
+
+async function postFicheTicketEmbed() {
+  try {
+    const channel = await client.channels.fetch(FICHE_TICKET_CHANNEL_ID);
+    if (!channel?.isTextBased()) {
+      logger.warn({ channelId: FICHE_TICKET_CHANNEL_ID }, "Salon fiche-ticket introuvable");
+      return;
+    }
+
+    const messages = await channel.messages.fetch({ limit: 10 });
+    const existing = messages.find((m) => m.author.id === client.user.id && m.components.length > 0);
+
+    const embed = new EmbedBuilder()
+      .setColor(0x000000)
+      .setTitle("📋 Ouvrir un ticket — Fiche")
+      .setDescription("Tu souhaites soumettre ou modifier ta fiche de personnage ?\nClique sur le bouton ci-dessous pour ouvrir un ticket.")
+      .setFooter({ text: "Un salon privé sera créé pour toi." });
+
+    const btn = new ButtonBuilder()
+      .setCustomId("fiche_ticket_btn")
+      .setLabel("📋 Fiche")
+      .setStyle(ButtonStyle.Secondary);
+
+    const row = new ActionRowBuilder().addComponents(btn);
+
+    if (existing) {
+      await existing.edit({ embeds: [embed], components: [row] });
+      logger.info("Embed fiche-ticket mis à jour");
+    } else {
+      await channel.send({ embeds: [embed], components: [row] });
+      logger.info("Embed fiche-ticket posté avec succès");
+    }
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de la publication de l'embed fiche-ticket");
+  }
+}
+
+async function handleFicheTicketSelect(interaction) {
+  const guild = interaction.guild;
+  if (!guild) return;
+
+  const pseudo = interaction.user.username;
+  const channelName = `fiche-${pseudo}`.toLowerCase().replace(/\s+/g, "-");
+
+  await interaction.deferReply({ ephemeral: true });
+
+  try {
+    const cached = guild.channels.cache.find((ch) => ch.name === channelName);
+    if (cached) {
+      try {
+        await guild.channels.fetch(cached.id);
+        await interaction.editReply({ content: `Tu as déjà un ticket de fiche ouvert : <#${cached.id}>` });
+        return;
+      } catch {
+        // Salon supprimé mais encore dans le cache — on continue la création
+      }
+    }
+
+    const ticketChannel = await guild.channels.create({
+      name: channelName,
+      type: ChannelType.GuildText,
+      parent: FICHE_TICKET_CATEGORY_ID,
+      permissionOverwrites: [
+        { id: guild.roles.everyone.id, deny: [PermissionFlagsBits.ViewChannel] },
+        {
+          id: interaction.user.id,
+          allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory],
+        },
+      ],
+    });
+
+    const roleMention = `<@&1510975359330418739>`;
+
+    const ticketEmbed = new EmbedBuilder()
+      .setColor(0x000000)
+      .setTitle("📋 Ticket — Fiche de personnage")
+      .setDescription(
+        `Bienvenue ${interaction.user} !\n\nUn membre du staff va examiner ta fiche. Envoie ta fiche complète ci-dessous.`,
+      )
+      .setFooter({ text: "Pour fermer ce ticket, contacte un administrateur." })
+      .setTimestamp();
+
+    const closeBtn = new ButtonBuilder()
+      .setCustomId("ticket_close")
+      .setLabel("🔒 Fermer le ticket")
+      .setStyle(ButtonStyle.Danger);
+
+    const btnRow = new ActionRowBuilder().addComponents(closeBtn);
+    await ticketChannel.send({ content: `${interaction.user} ${roleMention}`, embeds: [ticketEmbed], components: [btnRow] });
+
+    await sendLog(
+      new EmbedBuilder()
+        .setColor(0x5865f2)
+        .setTitle("📋 Ticket Fiche ouvert")
+        .addFields(
+          { name: "Membre", value: `${interaction.user} (${interaction.user.tag})`, inline: true },
+          { name: "Salon", value: `<#${ticketChannel.id}>`, inline: true },
+        )
+        .setTimestamp(),
+    );
+
+    await interaction.editReply({ content: `✅ Ton ticket a été créé : <#${ticketChannel.id}>` });
+    logger.info({ userId: interaction.user.id, channelName }, "Ticket fiche créé");
+  } catch (err) {
+    logger.error({ err, userId: interaction.user.id }, "Erreur lors de la création du ticket fiche");
     await interaction.editReply({ content: "❌ Une erreur est survenue lors de la création du ticket." });
   }
 }
@@ -3334,6 +3517,137 @@ async function handleSupprimerWarn(interaction) {
   await sendLog(embed);
   logger.info({ targetId: targetUser.id, modId: interaction.user.id, warnId: target.id }, "Avertissement supprimé");
 }
+
+async function handleEmbed(interaction) {
+  if (!hasRole(interaction.member, MOD_ROLES)) {
+    await interaction.reply({ content: "❌ Tu n'as pas la permission d'utiliser cette commande.", ephemeral: true });
+    return;
+  }
+
+  const texte = interaction.options.getString("texte");
+  const couleurRaw = interaction.options.getString("couleur");
+  const image = interaction.options.getString("image");
+
+  let couleur = 0x000000;
+  if (couleurRaw) {
+    const hex = couleurRaw.replace(/^#/, "");
+    const parsed = parseInt(hex, 16);
+    if (!isNaN(parsed)) couleur = parsed;
+  }
+
+  const embed = new EmbedBuilder().setColor(couleur).setDescription(texte);
+  if (image) embed.setImage(image);
+
+  try {
+    await interaction.channel.send({ embeds: [embed] });
+    await interaction.reply({ content: "✅ Embed envoyé.", ephemeral: true });
+  } catch (err) {
+    logger.error({ err }, "Erreur lors de l'envoi de l'embed");
+    await interaction.reply({ content: "❌ Une erreur est survenue.", ephemeral: true });
+  }
+}
+
+async function handleActiver(interaction) {
+  if (!hasRole(interaction.member, MOD_ROLES)) {
+    await interaction.reply({ content: "❌ Tu n'as pas la permission d'utiliser cette commande.", ephemeral: true });
+    return;
+  }
+
+  const heures = interaction.options.getInteger("durée");
+  const ms = heures * 60 * 60 * 1000;
+  const now = Date.now();
+  const expiresAt = now + ms;
+
+  if (botSession.timeoutId) {
+    clearTimeout(botSession.timeoutId);
+  }
+
+  botSession.activatedBy = `${interaction.user.username} (${interaction.user.id})`;
+  botSession.activatedAt = now;
+  botSession.expiresAt = expiresAt;
+
+  botSession.timeoutId = setTimeout(async () => {
+    try {
+      const ch = await client.channels.fetch(LOG_CHANNEL_ID);
+      if (ch?.isTextBased()) {
+        const expiredEmbed = new EmbedBuilder()
+          .setColor(0xed4245)
+          .setTitle("⏰ Session expirée")
+          .setDescription(
+            `La session activée par **${botSession.activatedBy}** est terminée.\n\nUtilise \`/activer\` pour démarrer une nouvelle session.`,
+          )
+          .setTimestamp();
+        await ch.send({ embeds: [expiredEmbed] });
+      }
+    } catch {}
+    botSession.activatedBy = null;
+    botSession.activatedAt = null;
+    botSession.expiresAt = null;
+    botSession.timeoutId = null;
+  }, ms);
+
+  const embed = new EmbedBuilder()
+    .setColor(0x57f287)
+    .setTitle("🟢 Bot Activé")
+    .setDescription(`Le bot restera en ligne pendant **${heures} heure${heures > 1 ? "s" : ""}**.`)
+    .addFields(
+      { name: "⚡ Activé par", value: interaction.user.toString(), inline: true },
+      { name: "⏱️ Durée", value: `${heures}h`, inline: true },
+      { name: "🔚 Se termine", value: `<t:${Math.floor(expiresAt / 1000)}:F> (<t:${Math.floor(expiresAt / 1000)}:R>)`, inline: false },
+    )
+    .setFooter({ text: "Utilise /activer à nouveau pour prolonger la session." })
+    .setTimestamp();
+
+  await interaction.reply({ embeds: [embed] });
+  logger.info({ user: interaction.user.tag, heures }, "Session bot activée");
+}
+
+async function handleStatut(interaction) {
+  const uptime = process.uptime();
+  const jours = Math.floor(uptime / 86400);
+  const heures = Math.floor((uptime % 86400) / 3600);
+  const minutes = Math.floor((uptime % 3600) / 60);
+  const secondes = Math.floor(uptime % 60);
+  const uptimeStr = `${jours}j ${heures}h ${minutes}m ${secondes}s`;
+
+  const embed = new EmbedBuilder()
+    .setColor(0x3498db)
+    .setTitle("📊 Statut du Bot")
+    .addFields({ name: "🟢 En ligne depuis", value: uptimeStr, inline: false });
+
+  if (botSession.expiresAt) {
+    embed.addFields(
+      { name: "⚡ Session activée par", value: botSession.activatedBy, inline: true },
+      { name: "🔚 Expire", value: `<t:${Math.floor(botSession.expiresAt / 1000)}:R>`, inline: true },
+    );
+  } else {
+    embed.addFields({ name: "⚡ Session", value: "Aucune session active — utilise `/activer`", inline: false });
+  }
+
+  embed.setTimestamp();
+  await interaction.reply({ embeds: [embed] });
+}
+
+const keepAliveServer = createServer((req, res) => {
+  const uptime = Math.floor(process.uptime());
+  const payload = JSON.stringify({
+    status: "online",
+    uptime_seconds: uptime,
+    session: botSession.expiresAt
+      ? {
+          activated_by: botSession.activatedBy,
+          expires_at: new Date(botSession.expiresAt).toISOString(),
+          remaining_ms: botSession.expiresAt - Date.now(),
+        }
+      : null,
+  });
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(payload);
+});
+
+keepAliveServer.listen(5000, "0.0.0.0", () => {
+  logger.info("Serveur keep-alive démarré sur le port 5000");
+});
 
 export function startBot() {
   if (!token) return;
