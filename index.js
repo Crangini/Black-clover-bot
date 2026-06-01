@@ -279,10 +279,69 @@ const baseCommands = [
       o.setName("texte").setDescription("Le texte à afficher dans l'embed").setRequired(true),
     )
     .addStringOption((o) =>
-      o.setName("couleur").setDescription("Couleur hex de l'embed (ex: FF0000 pour rouge)").setRequired(false),
+      o.setName("couleur").setDescription("Couleur de l'embed").setRequired(false).addChoices(
+        { name: "⬛ Noir", value: "000000" },
+        { name: "⬜ Blanc", value: "FFFFFF" },
+        { name: "🟥 Rouge", value: "ED4245" },
+        { name: "🟧 Orange", value: "E67E22" },
+        { name: "🟨 Jaune", value: "FEE75C" },
+        { name: "🟩 Vert", value: "57F287" },
+        { name: "🟦 Bleu", value: "3498DB" },
+        { name: "🟪 Violet", value: "9B59B6" },
+        { name: "🩷 Rose", value: "FF79C6" },
+        { name: "🩵 Bleu clair", value: "5865F2" },
+        { name: "⬛ Gris foncé", value: "2B2D31" },
+        { name: "🤍 Gris clair", value: "99AAB5" },
+        { name: "🟫 Marron", value: "D4A017" },
+        { name: "💛 Or", value: "F1C40F" },
+      ),
+    )
+    .addAttachmentOption((o) =>
+      o.setName("image").setDescription("Image à afficher dans l'embed").setRequired(false),
     )
     .addStringOption((o) =>
-      o.setName("image").setDescription("URL de l'image à afficher dans l'embed").setRequired(false),
+      o.setName("lien").setDescription("Lien d'invitation du serveur (optionnel)").setRequired(false),
+    )
+    .addStringOption((o) =>
+      o.setName("lien_texte").setDescription("Texte du bouton (ex: Rejoindre le serveur)").setRequired(false),
+    )
+    .toJSON(),
+  new SlashCommandBuilder()
+    .setName("editembed")
+    .setDescription("Modifier un embed existant du bot (staff uniquement)")
+    .setDefaultMemberPermissions(0)
+    .addStringOption((o) =>
+      o.setName("message_id").setDescription("L'ID du message embed à modifier").setRequired(true),
+    )
+    .addStringOption((o) =>
+      o.setName("texte").setDescription("Nouveau texte de l'embed").setRequired(false),
+    )
+    .addStringOption((o) =>
+      o.setName("couleur").setDescription("Nouvelle couleur de l'embed").setRequired(false).addChoices(
+        { name: "⬛ Noir", value: "000000" },
+        { name: "⬜ Blanc", value: "FFFFFF" },
+        { name: "🟥 Rouge", value: "ED4245" },
+        { name: "🟧 Orange", value: "E67E22" },
+        { name: "🟨 Jaune", value: "FEE75C" },
+        { name: "🟩 Vert", value: "57F287" },
+        { name: "🟦 Bleu", value: "3498DB" },
+        { name: "🟪 Violet", value: "9B59B6" },
+        { name: "🩷 Rose", value: "FF79C6" },
+        { name: "🩵 Bleu clair", value: "5865F2" },
+        { name: "⬛ Gris foncé", value: "2B2D31" },
+        { name: "🤍 Gris clair", value: "99AAB5" },
+        { name: "🟫 Marron", value: "D4A017" },
+        { name: "💛 Or", value: "F1C40F" },
+      ),
+    )
+    .addAttachmentOption((o) =>
+      o.setName("image").setDescription("Nouvelle image de l'embed").setRequired(false),
+    )
+    .addStringOption((o) =>
+      o.setName("lien").setDescription("Nouveau lien du bouton").setRequired(false),
+    )
+    .addStringOption((o) =>
+      o.setName("lien_texte").setDescription("Nouveau texte du bouton").setRequired(false),
     )
     .toJSON(),
   new SlashCommandBuilder()
@@ -319,23 +378,25 @@ async function sendLog(embed) {
 }
 
 const FICHE_ROLE_IDS = [
-  "1510238701467467888","1510238702859718866","1510238704361275424","1510238705405657189",
+  "1510238700741857410","1510238701467467888","1510238702859718866","1510238704361275424","1510238705405657189",
   "1510238706248974337","1510238708358578316","1510238709306490910","1510238710430437466",
   "1510238711504441464","1510238713014386830","1510238714796707850","1510238715866513409",
-  "1510238717741240503","1510238720110891078","1510238723294363668","1510238724376760521",
-  "1510238725634920501","1510238726503137380","1510238727249723394","1510238728411545690",
-  "1510238729246212206","1510238730105913445","1510238731079127070",
+  "1510238724376760521",
+  "1510238725634920501","1510238726503137380","1510238728411545690",
+  "1510238729246212206","1510238730105913445","1510238731079127070","1510986684618113055",
 ];
+const FICHE_ECLIPSE_IDS = ["1510988154356891718","1510988158790144051","1510988156738998443","1510988150783086704"];
+const FICHE_ECLIPSE_TRIGGER_ROLE = "1510238706248974337";
 const FICHE_GRADE_IDS = ["1510238735315239005","1510238736418340984","1510238737399939235","1510238738465423522"];
 const FICHE_ROYAUME_IDS = ["1510238741694775437","1510238742848344225","1510238744085532782","1510238745633230868","1510238747059552398"];
 const FICHE_ESPRIT_ID = "1510238749731328080";
-const FICHE_RACE_IDS = ["1510238752574931015","1510238753346556016","1510238754676412427","1510238755875983401","1510238756706193520"];
+const FICHE_RACE_IDS = ["1510238752574931015","1510238753346556016","1510238755875983401","1510238756706193520","1510238723294363668"];
 const FICHE_SEXE_IDS = ["1510238758891421917","1510238760602697819"];
 const FICHE_COMPAGNIE_IDS = ["1510238762771152976","1510238763735978134","1510238765585530920","1510238767104000101","1510238768278409276","1510238769402609715","1510238770698518608","1510238771633721514","1510238772766179428"];
 const FICHE_GRIMOIRE_IDS = ["1510238775744401429","1510238777061146764","1510238778005127290","1510238779040989185","1510238780567851041","1510238781775810610"];
 const FICHE_REMOVE_ROLE = "1510238910481961013";
 const FICHE_ADD_ROLE = "1510238909806809098";
-const FICHE_DIVIDER_ROLES = ["1510238732354322444","1510238740658786354","1510238748334624939","1510238750867980448","1510238757931057292","1510238761462665409","1510238773626146948","1510238783117983875"];
+const FICHE_DIVIDER_ROLES = ["1510238732354322444","1510238740658786354","1510238748334624939","1510238750867980448","1510238757931057292","1510238761462665409","1510238773626146948","1510238783117983875","1510986681807933570"];
 
 async function registerCommandsForGuild(guild, appId) {
   try {
@@ -379,6 +440,9 @@ async function registerCommandsForGuild(guild, appId) {
       )
       .addStringOption((o) =>
         o.setName("grimoire").setDescription("Le type de grimoire de ton personnage (optionnel)").setRequired(false).addChoices(...makeChoices(FICHE_GRIMOIRE_IDS)),
+      )
+      .addStringOption((o) =>
+        o.setName("eclipse").setDescription("Éclipsé — obligatoire si le rôle Éclipsé est choisi (optionnel sinon)").setRequired(false).addChoices(...makeChoices(FICHE_ECLIPSE_IDS)),
       )
       .toJSON();
 
@@ -614,12 +678,13 @@ client.on("interactionCreate", async (interaction) => {
     await handleStatut(interaction);
   } else if (interaction.commandName === "embed") {
     await handleEmbed(interaction);
+  } else if (interaction.commandName === "editembed") {
+    await handleEditEmbed(interaction);
   }
 });
 
 async function handleDeletefiche(interaction) {
-  const guild = interaction.guild;
-  if (!guild) return;
+  if (!interaction.guild) return;
 
   if (!hasRole(interaction.member, MOD_ROLES)) {
     await interaction.reply({ content: "❌ Tu n'as pas la permission d'utiliser cette commande.", ephemeral: true });
@@ -627,9 +692,11 @@ async function handleDeletefiche(interaction) {
   }
 
   const targetUser = interaction.options.getUser("membre");
-  const member = await guild.members.fetch(targetUser.id).catch(() => null);
+
+  const mainGuild = client.guilds.cache.get(MAIN_GUILD_ID) ?? interaction.guild;
+  const member = await mainGuild.members.fetch(targetUser.id).catch(() => null);
   if (!member) {
-    await interaction.reply({ content: "❌ Membre introuvable.", ephemeral: true });
+    await interaction.reply({ content: "❌ Membre introuvable sur le serveur principal.", ephemeral: true });
     return;
   }
 
@@ -644,22 +711,22 @@ async function handleDeletefiche(interaction) {
     ...FICHE_SEXE_IDS,
     ...FICHE_COMPAGNIE_IDS,
     ...FICHE_GRIMOIRE_IDS,
+    ...FICHE_ECLIPSE_IDS,
     ...FICHE_DIVIDER_ROLES,
     FICHE_ADD_ROLE,
   ];
 
-  let removed = 0;
-  for (const id of allFicheRoles) {
-    if (member.roles.cache.has(id)) {
-      try {
-        await member.roles.remove(id);
-        removed++;
-      } catch {}
-    }
-  }
+  const ficheRoleSet = new Set(allFicheRoles);
+  const rolesToRemove = member.roles.cache.filter((r) => ficheRoleSet.has(r.id));
+  const removed = rolesToRemove.size;
+
+  const keptRoles = member.roles.cache
+    .filter((r) => !ficheRoleSet.has(r.id) && r.id !== member.guild.id)
+    .map((r) => r.id);
+  keptRoles.push(FICHE_REMOVE_ROLE);
 
   try {
-    await member.roles.add(FICHE_REMOVE_ROLE);
+    await member.roles.set(keptRoles);
   } catch {}
 
   const embed = new EmbedBuilder()
@@ -723,11 +790,18 @@ async function handleCreatefiche(interaction) {
   const espritId = interaction.options.getString("esprit");
   const compagnieId = interaction.options.getString("compagnie");
   const grimoireId = interaction.options.getString("grimoire");
+  const eclipseId = interaction.options.getString("eclipse");
+
+  if (roleId === FICHE_ECLIPSE_TRIGGER_ROLE && !eclipseId) {
+    await interaction.editReply({ content: "❌ Le champ **Éclipsé** est obligatoire quand le rôle Éclipsé est sélectionné." });
+    return;
+  }
 
   const rolesToAdd = [roleId, gradeId, royaumeId, raceId, sexeId, ...FICHE_DIVIDER_ROLES];
   if (espritId) rolesToAdd.push(espritId);
   if (compagnieId) rolesToAdd.push(compagnieId);
   if (grimoireId) rolesToAdd.push(grimoireId);
+  if (eclipseId) rolesToAdd.push(eclipseId);
   rolesToAdd.push(FICHE_ADD_ROLE);
 
   const errors = [];
@@ -766,6 +840,7 @@ async function handleCreatefiche(interaction) {
       ...(espritId ? [{ name: "🌊 Esprit", value: `<@&${espritId}>`, inline: true }] : []),
       ...(compagnieId ? [{ name: "🛡️ Compagnie", value: `<@&${compagnieId}>`, inline: true }] : []),
       ...(grimoireId ? [{ name: "📖 Grimoire", value: `<@&${grimoireId}>`, inline: true }] : []),
+      ...(eclipseId ? [{ name: "🌑 Éclipsé", value: `<@&${eclipseId}>`, inline: true }] : []),
     )
     .setFooter({ text: "Black Clover RP — Golden Era 🍀" })
     .setTimestamp();
@@ -3526,20 +3601,25 @@ async function handleEmbed(interaction) {
 
   const texte = interaction.options.getString("texte");
   const couleurRaw = interaction.options.getString("couleur");
-  const image = interaction.options.getString("image");
+  const attachment = interaction.options.getAttachment("image");
+  const lien = interaction.options.getString("lien");
+  const lienTexte = interaction.options.getString("lien_texte") ?? "🔗 Rejoindre le serveur";
 
-  let couleur = 0x000000;
-  if (couleurRaw) {
-    const hex = couleurRaw.replace(/^#/, "");
-    const parsed = parseInt(hex, 16);
-    if (!isNaN(parsed)) couleur = parsed;
-  }
+  const couleur = couleurRaw ? parseInt(couleurRaw, 16) : 0x000000;
 
   const embed = new EmbedBuilder().setColor(couleur).setDescription(texte);
-  if (image) embed.setImage(image);
+  if (attachment) embed.setImage(attachment.url);
+
+  const components = [];
+  if (lien) {
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setLabel(lienTexte).setStyle(ButtonStyle.Link).setURL(lien),
+    );
+    components.push(row);
+  }
 
   try {
-    await interaction.channel.send({ embeds: [embed] });
+    await interaction.channel.send({ embeds: [embed], components });
     await interaction.reply({ content: "✅ Embed envoyé.", ephemeral: true });
   } catch (err) {
     logger.error({ err }, "Erreur lors de l'envoi de l'embed");
