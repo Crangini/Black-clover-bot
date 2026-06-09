@@ -1,200 +1,75 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(scriptDir, "data");
-const XP_FILE = path.join(DATA_DIR, "xp.json");
+const XP_FILE = "./xp_data.json";
 
-const XP_COOLDOWN_MS = 60_000;
-const cooldowns = new Map();
+let xpData = {};
 
-function ensureDir() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-function load() {
-  ensureDir();
-  if (!existsSync(XP_FILE)) return {};
+if (existsSync(XP_FILE)) {
   try {
-    return JSON.parse(readFileSync(XP_FILE, "utf-8"));
-  } catch {
-    return {};
+    xpData = JSON.parse(readFileSync(XP_FILE, "utf8"));
+  } catch (e) {
+    xpData = {};
   }
-}
-
-function save(data) {
-  ensureDir();
-  writeFileSync(XP_FILE, JSON.stringify(data, null, 2));
-}
-
-function xpRequiredForLevel(level) {
-  return 5 * level * level + 50 * level + 100;
-}
-
-function computeLevel(totalXp) {
-  let level = 0;
-  let remaining = totalXp;
-  while (remaining >= xpRequiredForLevel(level)) {
-    remaining -= xpRequiredForLevel(level);
-    level++;
-  }
-  return level;
 }
 
 export function tryGiveXp(userId) {
-  const now = Date.now();
-  const lastMessage = cooldowns.get(userId) ?? 0;
-  if (now - lastMessage < XP_COOLDOWN_MS) {
-    return null;
+  if (!xpData[userId]) xpData[userId] = { xp: 0, level: 1 };
+
+  xpData[userId].xp += Math.floor(Math.random() * 5) + 5;
+
+  const xpNeeded = xpData[userId].level * 100;
+  let leveledUp = false;
+  let newLevel = xpData[userId].level;
+
+  while (xpData[userId].xp >= xpNeeded) {
+    xpData[userId].xp -= xpNeeded;
+    newLevel++;
+    leveledUp = true;
   }
-  cooldowns.set(userId, now);
 
-  const data = load();
-  const entry = data[userId] ?? { xp: 0, level: 0 };
-  const gained = Math.floor(Math.random() * 11) + 15;
-  entry.xp += gained;
+  if (leveledUp) {
+    xpData[userId].level = newLevel;
+  }
 
-  const oldLevel = entry.level;
-  const newLevel = computeLevel(entry.xp);
-  entry.level = newLevel;
-
-  data[userId] = entry;
-  save(data);
-
-  return {
-    leveledUp: newLevel > oldLevel,
-    oldLevel,
-    newLevel,
-    totalXp: entry.xp,
-  };
-}
-
-export function getUserXp(userId) {
-  const data = load();
-  return data[userId] ?? { xp: 0, level: 0 };
+  saveXpData();
+  return { leveledUp, newLevel: xpData[userId].level };
 }
 
 export function getUserProgress(userId) {
-  const data = load();
-  const entry = data[userId] ?? { xp: 0, level: 0 };
-
- import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.resolve(scriptDir, "data");
-const XP_FILE = path.join(DATA_DIR, "xp.json");
-
-const XP_COOLDOWN_MS = 60_000;
-const cooldowns = new Map();
-
-function ensureDir() {
-  if (!existsSync(DATA_DIR)) {
-    mkdirSync(DATA_DIR, { recursive: true });
-  }
-}
-
-function load() {
-  ensureDir();
-  if (!existsSync(XP_FILE)) return {};
-  try {
-    return JSON.parse(readFileSync(XP_FILE, "utf-8"));
-  } catch {
-    return {};
-  }
-}
-
-function save(data) {
-  ensureDir();
-  writeFileSync(XP_FILE, JSON.stringify(data, null, 2));
-}
-
-function xpRequiredForLevel(level) {
-  return 5 * level * level + 50 * level + 100;
-}
-
-function computeLevel(totalXp) {
-  let level = 0;
-  let remaining = totalXp;
-  while (remaining >= xpRequiredForLevel(level)) {
-    remaining -= xpRequiredForLevel(level);
-    level++;
-  }
-  return level;
-}
-
-export function tryGiveXp(userId) {
-  const now = Date.now();
-  const lastMessage = cooldowns.get(userId) ?? 0;
-  if (now - lastMessage < XP_COOLDOWN_MS) {
-    return null;
-  }
-  cooldowns.set(userId, now);
-
-  const data = load();
-  const entry = data[userId] ?? { xp: 0, level: 0 };
-  const gained = Math.floor(Math.random() * 11) + 15;
-  entry.xp += gained;
-
-  const oldLevel = entry.level;
-  const newLevel = computeLevel(entry.xp);
-  entry.level = newLevel;
-
-  data[userId] = entry;
-  save(data);
-
-  return {
-    leveledUp: newLevel > oldLevel,
-    oldLevel,
-    newLevel,
-    totalXp: entry.xp,
-  };
-}
-
-export function getUserXp(userId) {
-  const data = load();
-  return data[userId] ?? { xp: 0, level: 0 };
-}
-
-export function getUserProgress(userId) {
-  const data = load();
-  const entry = data[userId] ?? { xp: 0, level: 0 };
-
-  let remaining = entry.xp;
-  let level = 0;
-  while (remaining >= xpRequiredForLevel(level)) {
-    remaining -= xpRequiredForLevel(level);
-    level++;
+  if (!xpData[userId]) {
+    return { level: 1, totalXp: 0, xpInLevel: 0, xpNeeded: 100, percent: 0, progressBar: "░░░░░░░░░░" };
   }
 
-  const xpInLevel = remaining;
-  const xpNeeded = xpRequiredForLevel(level);
+  const level = xpData[userId].level;
+  const xpInLevel = xpData[userId].xp;
+  const xpNeeded = level * 100;
   const percent = Math.floor((xpInLevel / xpNeeded) * 100);
-  const filled = Math.floor(percent / 10);
-  const progressBar = "▓".repeat(filled) + "░".repeat(10 - filled);
 
-  return { level, xpInLevel, xpNeeded, totalXp: entry.xp, progressBar, percent };
+  return {
+    level,
+    totalXp: xpInLevel + (level - 1) * 100,
+    xpInLevel,
+    xpNeeded,
+    percent,
+    progressBar: "█".repeat(Math.floor(percent / 10)) + "░".repeat(10 - Math.floor(percent / 10))
+  };
 }
 
 export function getLeaderboard(limit = 10) {
-  const data = load();
-  return Object.entries(data)
-    .map(([userId, d]) => ({ userId, xp: d.xp, level: d.level }))
-    .sort((a, b) => b.xp - a.xp)
-    .slice(0, limit);
+  return Object.entries(xpData)
+    .sort((a, b) => (b[1].level * 100 + b[1].xp) - (a[1].level * 100 + a[1].xp))
+    .slice(0, limit)
+    .map(([userId, data]) => ({ userId, level: data.level, xp: data.xp + (data.level - 1) * 100 }));
 }
 
 export function getUserRank(userId) {
-  const data = load();
-  const sorted = Object.entries(data)
-    .map(([id, d]) => ({ id, xp: d.xp }))
-    .sort((a, b) => b.xp - a.xp);
-  const index = sorted.findIndex((e) => e.id === userId);
-  return index === -1 ? sorted.length + 1 : index + 1;
+  const sorted = Object.entries(xpData)
+    .sort((a, b) => (b[1].level * 100 + b[1].xp) - (a[1].level * 100 + a[1].xp));
+  return sorted.findIndex(([id]) => id === userId) + 1 || 999;
 }
 
-
+function saveXpData() {
+  try {
+    writeFileSync(XP_FILE, JSON.stringify(xpData, null, 2));
+  } catch (e) {}
+}
